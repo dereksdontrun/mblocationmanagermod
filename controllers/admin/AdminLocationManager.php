@@ -685,7 +685,7 @@ class AdminLocationManagerController extends ModuleAdminController {
             $respuesta = Db::getInstance()->ExecuteS($sql); 
 
             if(empty($respuesta)){
-                    $sql = "INSERT INTO lafrips_localizaciones(id_product, id_product_attribute, modificado) VALUES (".$product[0].",".$product[1].",  NOW()) ;";
+                    $sql = "INSERT INTO lafrips_localizaciones(id_product, id_product_attribute, date_add) VALUES (".$product[0].",".$product[1].",  NOW()) ;";
                     Db::getInstance()->ExecuteS($sql);
                 }
             /*
@@ -698,7 +698,7 @@ class AdminLocationManagerController extends ModuleAdminController {
                     $response &= WarehouseCore::setProductLocation($product[0], $product[1], $id_warehouse, $location);
                 }
                 //después de introducir la localización en lafrips_products, hacerlo en tabla auxiliar lafrips_localizaciones
-                $sql = "UPDATE lafrips_localizaciones SET modificado = NOW(), p_location = '".$location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), p_location = '".$location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
             }else {
                 //$location tiene algo pero no encaja en regex, lanzamos error
@@ -716,7 +716,7 @@ class AdminLocationManagerController extends ModuleAdminController {
 
                 WarehouseCore::setProductLocation($product[0], $product[1], $id_warehouse, $location);
                 //después de introducir la localización en lafrips_products, hacerlo en tabla auxiliar lafrips_localizaciones
-                $sql = "UPDATE lafrips_localizaciones SET modificado = NOW(), p_location = '".$location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), p_location = '".$location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
             }else {
                 //$location tiene algo pero no encaja en regex, lanzamos error
@@ -726,14 +726,14 @@ class AdminLocationManagerController extends ModuleAdminController {
            
 
             /*if($p_cantidad){
-                $sql = "UPDATE lafrips_localizaciones SET modificado = NOW(), p_cantidad = ".$p_cantidad." WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), p_cantidad = ".$p_cantidad." WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
             }*/
     /*  FILTRO PARA LOCALIZACIONES DE REPOSICIÓN de momento lo dejamos libre 22/08/2018
             //filtrar $r_location temporalmente, hasta que se implante un formato. Ahora solo impide r_locations de más de 9 caracteres:
             if ((!$r_location)||(preg_match("/^[0-9a-zA-Z]{0,9}$/", $r_location))){
                 //$r_location tiene algo y encaja en regex, lo metemos en r_location, o está vacio y lo vaciamos
-                $sql = "UPDATE lafrips_localizaciones SET modificado = NOW(), r_location = '".$r_location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), r_location = '".$r_location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
             }else {
                 //$r_location tiene algo pero no encaja en regex, lanzamos error
@@ -750,13 +750,13 @@ class AdminLocationManagerController extends ModuleAdminController {
 
 
             if ($r_location != $localizacion_repo){
-                $sql = "UPDATE lafrips_localizaciones SET modificado = NOW(), r_location = '".$r_location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), r_location = '".$r_location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
             }
 
             //Para cantidades de reposición (no usuado)
             /*if($r_cantidad){
-                $sql = "UPDATE lafrips_localizaciones SET modificado = NOW(), r_cantidad = '".$r_cantidad."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), r_cantidad = '".$r_cantidad."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
             }*/
         } //fin if (id_warehouse == 1)
