@@ -718,6 +718,35 @@ class AdminLocationManagerController extends ModuleAdminController {
                 //después de introducir la localización en lafrips_products, hacerlo en tabla auxiliar lafrips_localizaciones
                 $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), p_location = '".$location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
                 Db::getInstance()->ExecuteS($sql);
+
+                //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
+                $mensaje_error = 'UPDATE de localización desde módulo Localizador';
+                $id_product = $product[0];
+                $id_product_attribute = $product[1];
+                $id_producto = $id_product.'_'.$id_product_attribute;
+                $id_empleado = Context::getContext()->employee->id;
+                $nombre_empleado = Context::getContext()->employee->firstname;
+
+                $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
+                (id_producto,
+                id_product,
+                id_product_attribute,                
+                localizacion,                             
+                id_employee,
+                nombre_employee,                
+                mensaje_error,
+                date_add)
+                VALUES
+                ('$id_producto',
+                $id_product,
+                $id_product_attribute,                
+                '$location',                             
+                $id_empleado,
+                '$nombre_empleado',                    
+                '$mensaje_error',
+                NOW())";
+            
+                Db::getInstance()->Execute($sql_insert_localizaciones_log);
             }else {
                 //$location tiene algo pero no encaja en regex, lanzamos error
                 die(Tools::jsonEncode(array('error'=> true, 'message'=>$this->module->i18n['localizacion_picking_incorrecta'])));
@@ -751,7 +780,37 @@ class AdminLocationManagerController extends ModuleAdminController {
 
             if ($r_location != $localizacion_repo){
                 $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), r_location = '".$r_location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+
                 Db::getInstance()->ExecuteS($sql);
+
+                //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
+                $mensaje_error = 'UPDATE de reposición desde módulo Localizador';
+                $id_product = $product[0];
+                $id_product_attribute = $product[1];
+                $id_producto = $id_product.'_'.$id_product_attribute;
+                $id_empleado = Context::getContext()->employee->id;
+                $nombre_empleado = Context::getContext()->employee->firstname;
+
+                $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
+                (id_producto,
+                id_product,
+                id_product_attribute,                
+                reposicion,                             
+                id_employee,
+                nombre_employee,                
+                mensaje_error,
+                date_add)
+                VALUES
+                ('$id_producto',
+                $id_product,
+                $id_product_attribute,                
+                '$r_location',                             
+                $id_empleado,
+                '$nombre_empleado',                    
+                '$mensaje_error',
+                NOW())";
+            
+                Db::getInstance()->Execute($sql_insert_localizaciones_log);
             }
 
             //Para cantidades de reposición (no usuado)
