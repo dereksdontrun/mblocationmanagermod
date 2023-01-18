@@ -185,9 +185,10 @@
             }
 
             //20/05/2021 Recibimos el dato de si el producto es novedad, el consumo redondeado, y la clasificación ABC como abc, siendo success si es C, y ponemos badge success, warning si es B y ponemos badge warning y danger si es A, poniendo badge danger.. Si es novedad, se pone consumo N y warning, como clasificación B. 
+            //18/01/2023 Queremos poner el consumo si el producto es Novedad también, hacemos salto de línea y metemso el consumo 
             if (product_infos.novedad == 1) {
                 // producto novedad, ponemos Tipo B y una N en lugar de cifra de stock
-                var consumo = 'N';
+                var consumo = 'N<br>'+product_infos.consumo;
                 var badge = 'warning';
             } else {
                 var consumo = product_infos.consumo;

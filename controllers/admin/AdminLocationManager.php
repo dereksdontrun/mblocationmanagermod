@@ -720,7 +720,7 @@ class AdminLocationManagerController extends ModuleAdminController {
                 Db::getInstance()->ExecuteS($sql);
 
                 //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
-                $mensaje_error = 'UPDATE de localización desde módulo Localizador';
+                $mensaje_error = 'UPDATE localización Localizador';
                 $id_product = $product[0];
                 $id_product_attribute = $product[1];
                 $id_producto = $id_product.'_'.$id_product_attribute;
@@ -784,7 +784,7 @@ class AdminLocationManagerController extends ModuleAdminController {
                 Db::getInstance()->ExecuteS($sql);
 
                 //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
-                $mensaje_error = 'UPDATE de reposición desde módulo Localizador';
+                $mensaje_error = 'UPDATE reposición Localizador';
                 $id_product = $product[0];
                 $id_product_attribute = $product[1];
                 $id_producto = $id_product.'_'.$id_product_attribute;
