@@ -404,15 +404,15 @@ class AdminLocationManagerController extends ModuleAdminController {
             $query->from('product', 'p');
             $query->join(Shop::addSqlAssociation('product', 'p'));
             $query->innerJoin('product_lang', 'pl', 'pl.id_product = p.id_product AND pl.id_lang = ' . $id_lang);
-            $query->leftJoin('category_product', 'cp', 'cp.id_product = p.id_product');               
+            $query->leftJoin('category_product', 'cp', 'cp.id_product = p.id_product');  
+            $query->leftJoin('supply_order_detail', 'od', 'od.id_product = p.id_product');
+            $query->leftJoin('supply_order', 'so', 'so.id_supply_order = od.id_supply_order'); 
             $query->leftJoin('image', 'i', 'i.id_product = p.id_product AND i.cover = 1');
             $query->leftJoin('product_attribute', 'pa', 'pa.id_product = p.id_product');
             $query->leftJoin('product_attribute_image', 'pai', 'pai.id_product_attribute = pa.id_product_attribute');
             $query->leftJoin('product_attribute_combination', 'pac', 'pac.id_product_attribute = pa.id_product_attribute');
-            $query->leftJoin('supply_order_detail', 'od', 'od.id_product = p.id_product AND od.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');
-            $query->leftJoin('supply_order', 'so', 'so.id_supply_order = od.id_supply_order');
             $query->leftJoin('attribute', 'atr', 'atr.id_attribute = pac.id_attribute');
-            $query->leftJoin('attribute_lang', 'al', 'al.id_attribute = atr.id_attribute AND al.id_lang = ' . $id_lang);
+            $query->leftJoin('attribute_lang', 'al', 'al.id_attribute = atr.id_attribute AND al.id_lang = ' . $id_lang.Shop::addSqlRestrictionOnLang('pl'));
             $query->leftJoin('attribute_group_lang', 'agl', 'agl.id_attribute_group = atr.id_attribute_group AND agl.id_lang = ' . $id_lang);
             $query->leftJoin('warehouse_product_location', 'pw', 'pw.id_product = p.id_product AND pw.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');
             $query->leftJoin('localizaciones', 'fl', 'fl.id_product = p.id_product AND fl.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');
@@ -535,11 +535,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         
         $product = explode('_', $product);
         $product = array_map('intval', $product);
-        $id_product = $product[0];
-        $id_product_attribute = $product[1];
-        $id_producto = $id_product.'_'.$id_product_attribute;
-        $id_empleado = Context::getContext()->employee->id;
-        $nombre_empleado = Context::getContext()->employee->firstname;
 
         //si se ha seleccionado un tipo de gestión de stock (sumar o restar o transferir) y una cantidad a gestionar:
         if(($tipo_gestion_stock)&&($cantidad_a_gestionar !== '')){
@@ -551,41 +546,13 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $warehouse = new Warehouse($id_warehouse);
                 //die(Tools::jsonEncode(array('error'=> true, 'message'=>'$id_warehouse = '.$id_warehouse.' $id_product = '.$product[0].' $id_product_att = '.$product[1].' $cantidad_a_gestionar = '.$cantidad_a_gestionar.' $id_stock_mvt_reason = '.$id_stock_mvt_reason.' $warehouse = '.$warehouse)));
                 
-                $posible_gestionar = $stock_manager->removeProduct($id_product, $id_product_attribute, $warehouse, $cantidad_a_gestionar, $id_stock_mvt_reason);
+                $posible_gestionar = $stock_manager->removeProduct($product[0], $product[1], $warehouse, $cantidad_a_gestionar, $id_stock_mvt_reason);
 
                 //actualizar stock_available tras la operación
-                StockAvailable::synchronize($id_product);
+                StockAvailable::synchronize($product[0]);
 
-                if(!$posible_gestionar) {
-                    die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error de Stock')));  
-                } else {
-                    $mensaje_error = 'UPDATE restar '.$cantidad_a_gestionar.'_'.$id_warehouse.' stock Localizador';           
-
-                    $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-                    (id_producto,
-                    id_product,
-                    id_product_attribute, 
-                    ean,               
-                    localizacion, 
-                    reposicion,                             
-                    id_employee,
-                    nombre_employee,                
-                    mensaje_error,
-                    date_add)
-                    VALUES
-                    ('$id_producto',
-                    $id_product,
-                    $id_product_attribute,
-                    '$ean13',                 
-                    '$location', 
-                    '$r_location',                             
-                    $id_empleado,
-                    '$nombre_empleado',                    
-                    '$mensaje_error',
-                    NOW())";
-                
-                    Db::getInstance()->Execute($sql_insert_localizaciones_log);
-                }                                                  
+                if(!$posible_gestionar)
+                    die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error de Stock')));                                
 
             }else if($tipo_gestion_stock == 1){//SUMAR
                 //creamos instancia de stockmanager para poder sumar stock
@@ -596,53 +563,37 @@ class AdminLocationManagerController extends ModuleAdminController {
                 //die(Tools::jsonEncode(array('error'=> true, 'message'=>'$price_te = '.$price_te)));
 
                 //obtener price_te, sacamos el price_te del último stock introducido ya que el almacén es FIFO
-                $sql = "SELECT price_te FROM lafrips_stock WHERE id_product = $id_product AND id_product_attribute = $id_product_attribute AND id_warehouse = $id_warehouse ORDER BY id_stock DESC";
-                $price_te = Db::getInstance()->getValue($sql);
+                $sql = "SELECT price_te AS price FROM lafrips_stock WHERE id_product = $product[0] AND id_product_attribute = $product[1] AND id_warehouse = $id_warehouse ORDER BY id_stock DESC LIMIT 1;";
+                $result = Db::getInstance()->ExecuteS($sql);
 
                 //En caso de ser un producto que no estaba en gestión avanzada o aún no tiene stock en ese almacén y por lo tanto nunca tuvo línea de stock en lafrips_stock, no se puede sacar price_te con esa consulta y dará error al intentar sumar, si es así, sacamos price_te buscando wholesale_price en la línea del producto en lafrips_product
-                if (!$price_te){
-                    //si no hay stock en lafrips_stock:
+                if ($result){
+                    $prices = array();
+
+                    foreach($result as $resultado) {
+                        $prices[] = $resultado[price];
+                    }
+                    $price_te = $prices[0];
+                    
+                } else { //si no hay stock en lafrips_stock:
                     //obtener price_te, sacando el precio de proveedor desde la tabla lafrips_product
-                    $sql = "SELECT wholesale_price FROM lafrips_product WHERE id_product = $id_product";
-                    $price_te = Db::getInstance()->getValue($sql);                    
+                    $sql = "SELECT wholesale_price AS price FROM lafrips_product WHERE id_product = $product[0];";
+                    $result = Db::getInstance()->ExecuteS($sql);
+                    $prices = array();
+
+                    foreach($result as $resultado) {
+                        $prices[] = $resultado[price];
+                    }
+                    $price_te = $prices[0];
 
                 }
                 //die(Tools::jsonEncode(array('error'=> true, 'message'=>'$price_te = '.$price_te)));
-                $posible_gestionar = $stock_manager->addProduct($id_product, $id_product_attribute, $warehouse, $cantidad_a_gestionar, $id_stock_mvt_reason, $price_te);
+                $posible_gestionar = $stock_manager->addProduct($product[0], $product[1], $warehouse, $cantidad_a_gestionar, $id_stock_mvt_reason, $price_te);
+                if(!$posible_gestionar)
+                    die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error de Stock')));
 
                 //actualizar stock_available tras la operación
-                StockAvailable::synchronize($id_product);
-
-                if(!$posible_gestionar) {
-                    die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error de Stock')));  
-                } else {
-                    $mensaje_error = 'UPDATE sumar '.$cantidad_a_gestionar.'_'.$id_warehouse.' stock Localizador';           
-
-                    $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-                    (id_producto,
-                    id_product,
-                    id_product_attribute, 
-                    ean,               
-                    localizacion, 
-                    reposicion,                             
-                    id_employee,
-                    nombre_employee,                
-                    mensaje_error,
-                    date_add)
-                    VALUES
-                    ('$id_producto',
-                    $id_product,
-                    $id_product_attribute,
-                    '$ean13',                 
-                    '$location', 
-                    '$r_location',                             
-                    $id_empleado,
-                    '$nombre_empleado',                    
-                    '$mensaje_error',
-                    NOW())";
-                
-                    Db::getInstance()->Execute($sql_insert_localizaciones_log);
-                }                                 
+                StockAvailable::synchronize($product[0]);
 
             }else if(($tipo_gestion_stock == 3)||($tipo_gestion_stock == 4)){ //TRANSFERIR entre almacenes
                 //si $tipo_gestion_stock es 3 se transfiere de almacén de tienda "online" ID 1 al almacén de tienda "física" ID 4, y viceversa
@@ -658,43 +609,12 @@ class AdminLocationManagerController extends ModuleAdminController {
                 //creamos instancia de stockmanager para poder transferir stock entre almacenes
                 $stock_manager = new StockManager();
 
-                $posible_transferir = $stock_manager->transferBetweenWarehouses($id_product, $id_product_attribute, $cantidad_a_gestionar,$almacen_desde, $almacen_hasta);
-
-                //actualizar stock_available tras la operación
-                StockAvailable::synchronize($id_product);
+                $posible_transferir = $stock_manager->transferBetweenWarehouses($product[0], $product[1], $cantidad_a_gestionar,$almacen_desde, $almacen_hasta);
                 
                 //si no hay unidades suficientes en el almacen origen devuelve false, y sacamos error, si es posible ejecutará la transferencia
-                if(!$posible_transferir) {
+                if(!$posible_transferir)
                     die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error, Comprueba la transferencia de stock')));
-                } else {
-                    $mensaje_error = 'UPDATE transferir '.$cantidad_a_gestionar.'_'.$almacen_desde.'-'.$almacen_hasta.' stock Localizador';           
-
-                    $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-                    (id_producto,
-                    id_product,
-                    id_product_attribute, 
-                    ean,               
-                    localizacion, 
-                    reposicion,                             
-                    id_employee,
-                    nombre_employee,                
-                    mensaje_error,
-                    date_add)
-                    VALUES
-                    ('$id_producto',
-                    $id_product,
-                    $id_product_attribute,
-                    '$ean13',                 
-                    '$location', 
-                    '$r_location',                             
-                    $id_empleado,
-                    '$nombre_empleado',                    
-                    '$mensaje_error',
-                    NOW())";
-                
-                    Db::getInstance()->Execute($sql_insert_localizaciones_log);
-                }   
-                
+                    //die(Tools::jsonEncode(array('error'=> true, 'message'=>$posible_transferir )));
             }          
 
         }
@@ -716,41 +636,14 @@ class AdminLocationManagerController extends ModuleAdminController {
 
                 //crear nueva entrada en tabla lafrips_warehouse_product_location (asignar almacén)
                 $warehouse_location_entity = new WarehouseProductLocation();
-                $warehouse_location_entity->id_product = $id_product;   //id_product
-                $warehouse_location_entity->id_product_attribute = $id_product_attribute; //id_product_attribute
+                $warehouse_location_entity->id_product = $product[0];   //id_product
+                $warehouse_location_entity->id_product_attribute = $product[1]; //id_product_attribute
                 $warehouse_location_entity->id_warehouse = $almacenAsignado;   //id_warehouse (4 es tienda física, 1 tienda online)
                 $warehouse_location_entity->location = '';  //localización, vacia puesto que en tienda física no usamos y en la online habría que colocarlo
                 $warehouse_location_entity->save();
 
                 //actualizar stock_available tras la operación
-                StockAvailable::synchronize($id_product);
-
-                $mensaje_error = 'UPDATE asignar almacen '.$almacenAsignado.' a producto Localizador';           
-
-                $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-                (id_producto,
-                id_product,
-                id_product_attribute, 
-                ean,               
-                localizacion, 
-                reposicion,                             
-                id_employee,
-                nombre_employee,                
-                mensaje_error,
-                date_add)
-                VALUES
-                ('$id_producto',
-                $id_product,
-                $id_product_attribute,
-                '$ean13',                 
-                '$location', 
-                '$r_location',                             
-                $id_empleado,
-                '$nombre_empleado',                    
-                '$mensaje_error',
-                NOW())";
-            
-                Db::getInstance()->Execute($sql_insert_localizaciones_log);
+                StockAvailable::synchronize($product[0]);
 
                 //creamos una variable que indicará a efectos de la respuesta ajax más abajo que ha añadido un almacén
                 $almacenasignadoconexito = 1;
@@ -767,50 +660,19 @@ class AdminLocationManagerController extends ModuleAdminController {
         }
 
         //EAN13
-        //actualizamos siempre a lo que venga como ean13
+        //Para que si borramos el ean13 lo interprete como borrar, de momento le obligo a que siempre actualice el ean13 a lo que haya en el formulario
         //if(($ean13)||($weight)){ Hemos quitado peso de la vista del módulo
-        //si id de atributo no es 0 estamos en combinación y cambiamos ese ean, si es 0 no hay combinaciones y cambiamos a producto
-        if($id_product_attribute) {
-            $pa = new Combination($id_product_attribute);
-        } else {
-            $pa = new Product($id_product);
-        }  
-        
-        if ($pa->ean13 != $ean13) {
-            //el ean del input es diferente del que tiene el producto, hacemos insert a loclaizaiones log antes de actualizarlo
-            $mensaje_error = 'UPDATE ean13 Localizador';           
+        if($ean13 || !$ean13){
+            if($product[1])
+                $pa = new Combination($product[1]);
+            else
+                $pa = new Product($product[0]);
 
-            $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-            (id_producto,
-            id_product,
-            id_product_attribute, 
-            ean,               
-            localizacion, 
-            reposicion,                             
-            id_employee,
-            nombre_employee,                
-            mensaje_error,
-            date_add)
-            VALUES
-            ('$id_producto',
-            $id_product,
-            $id_product_attribute,
-            '$ean13',                 
-            '$location', 
-            '$r_location',                             
-            $id_empleado,
-            '$nombre_empleado',                    
-            '$mensaje_error',
-            NOW())";
-        
-            Db::getInstance()->Execute($sql_insert_localizaciones_log);
+            $pa -> ean13 = $ean13;
+            //$pa -> location = $location;
+            //$pa -> weight = $weight;
+            $response &= $pa ->save();
         }
-
-        $pa->ean13 = $ean13;
-        //$pa -> location = $location;
-        //$pa -> weight = $weight;
-        $response &= $pa->save();
-        
 
         //LOCALIZACIONES
         //Si en el select arriba hemos seleccionado un almacen que no sea almacén online (id_warehouse =1) no queremos procesar ningún cambio en las localizaciones, ni de picking ni de reposición, ya que para la tienda física no utilizamos, de modo que ignoramos todo el proceso referente a las localizaciones. De todas formas, cuando estemos procesando en almacén tienda mugica, se ocultarán las casillas de localización
@@ -819,11 +681,11 @@ class AdminLocationManagerController extends ModuleAdminController {
 
             //comprobar si el producto está en la tabla localizaciones, si no está (el resultado de buscarlo en la tabla es empty()), hacer un insert, introduciendo en la tabla el id_product y el id_product_attribute. A partir de ahí, en las lineas posteriores se hacen updates sobre el producto en la tabla
 
-            $sql = "SELECT id_product, id_product_attribute FROM lafrips_localizaciones WHERE id_product = $id_product AND id_product_attribute = $id_product_attribute";
+            $sql = "SELECT id_product, id_product_attribute FROM lafrips_localizaciones WHERE id_product = ".$product[0]." AND id_product_attribute = ".$product[1]." ;";
             $respuesta = Db::getInstance()->ExecuteS($sql); 
 
             if(empty($respuesta)){
-                    $sql = "INSERT INTO lafrips_localizaciones(id_product, id_product_attribute, date_add) VALUES ($id_product, $id_product_attribute,  NOW()) ;";
+                    $sql = "INSERT INTO lafrips_localizaciones(id_product, id_product_attribute, date_add) VALUES (".$product[0].",".$product[1].",  NOW()) ;";
                     Db::getInstance()->ExecuteS($sql);
                 }
             /*
@@ -851,44 +713,40 @@ class AdminLocationManagerController extends ModuleAdminController {
                 if($id_warehouse){
                     $response &= WarehouseCore::setProductLocation($product[0], $product[1], $id_warehouse, $location);
                 }*/
-                //20/10/2023 obtenemos la localización de almacén online actual para comparar con la que viene en el formualrio
-                $location_actual = WarehouseCore::getProductLocation($id_product, $id_product_attribute, $id_warehouse);
 
-                if ($location != $location_actual) {
-                    WarehouseCore::setProductLocation($id_product, $id_product_attribute, $id_warehouse, $location);
-                    //después de introducir la localización en lafrips_products, hacerlo en tabla auxiliar lafrips_localizaciones
-                    $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), p_location = '$location' WHERE id_product = $id_product AND id_product_attribute = $id_product_attribute";
-                    Db::getInstance()->ExecuteS($sql);
+                WarehouseCore::setProductLocation($product[0], $product[1], $id_warehouse, $location);
+                //después de introducir la localización en lafrips_products, hacerlo en tabla auxiliar lafrips_localizaciones
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), p_location = '".$location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
+                Db::getInstance()->ExecuteS($sql);
 
-                    //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
-                    $mensaje_error = 'UPDATE localización Localizador';                
+                //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
+                $mensaje_error = 'UPDATE localización Localizador';
+                $id_product = $product[0];
+                $id_product_attribute = $product[1];
+                $id_producto = $id_product.'_'.$id_product_attribute;
+                $id_empleado = Context::getContext()->employee->id;
+                $nombre_empleado = Context::getContext()->employee->firstname;
 
-                    $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-                    (id_producto,
-                    id_product,
-                    id_product_attribute, 
-                    ean,               
-                    localizacion, 
-                    reposicion,                            
-                    id_employee,
-                    nombre_employee,                
-                    mensaje_error,
-                    date_add)
-                    VALUES
-                    ('$id_producto',
-                    $id_product,
-                    $id_product_attribute,  
-                    '$ean13',
-                    '$location',              
-                    '$r_location',                             
-                    $id_empleado,
-                    '$nombre_empleado',                    
-                    '$mensaje_error',
-                    NOW())";
-                
-                    Db::getInstance()->Execute($sql_insert_localizaciones_log);
-                }
-                
+                $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
+                (id_producto,
+                id_product,
+                id_product_attribute,                
+                localizacion,                             
+                id_employee,
+                nombre_employee,                
+                mensaje_error,
+                date_add)
+                VALUES
+                ('$id_producto',
+                $id_product,
+                $id_product_attribute,                
+                '$location',                             
+                $id_empleado,
+                '$nombre_empleado',                    
+                '$mensaje_error',
+                NOW())";
+            
+                Db::getInstance()->Execute($sql_insert_localizaciones_log);
             }else {
                 //$location tiene algo pero no encaja en regex, lanzamos error
                 die(Tools::jsonEncode(array('error'=> true, 'message'=>$this->module->i18n['localizacion_picking_incorrecta'])));
@@ -913,7 +771,7 @@ class AdminLocationManagerController extends ModuleAdminController {
     */
             //de momento no filtramos la localización hasta que se aclare la forma de hacerlo
             //sacamos r_location de lafrips_localizaciones y comparamos con lo que haya en la casilla en el formulario del módulo, si es diferente lo cambiamos, así, si está vacio vacia también
-            $sql = "SELECT r_location AS localizacion_repo FROM lafrips_localizaciones WHERE id_product = $id_product AND id_product_attribute = $id_product_attribute";
+            $sql = "SELECT r_location AS localizacion_repo FROM lafrips_localizaciones WHERE id_product = ".$product[0]." AND id_product_attribute = ".$product[1]." ;";
             $respuesta = Db::getInstance()->ExecuteS($sql); 
             foreach ($respuesta as $resultado) {
                     $localizacion_repo = $resultado['localizacion_repo'];
@@ -921,20 +779,23 @@ class AdminLocationManagerController extends ModuleAdminController {
 
 
             if ($r_location != $localizacion_repo){
-                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), r_location = '$r_location' WHERE id_product = $id_product AND id_product_attribute = $id_product_attribute";
+                $sql = "UPDATE lafrips_localizaciones SET date_upd = NOW(), r_location = '".$r_location."' WHERE id_product = '".$product[0]."' AND id_product_attribute = '".$product[1]."' ;";
 
                 Db::getInstance()->ExecuteS($sql);
 
                 //03/01/2023 metemos log en lafrips_localizaciones_log. Utilizamos mensaje error para indicar que hacemos el insert desde el localizador
-                $mensaje_error = 'UPDATE reposición Localizador';                
+                $mensaje_error = 'UPDATE reposición Localizador';
+                $id_product = $product[0];
+                $id_product_attribute = $product[1];
+                $id_producto = $id_product.'_'.$id_product_attribute;
+                $id_empleado = Context::getContext()->employee->id;
+                $nombre_empleado = Context::getContext()->employee->firstname;
 
                 $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
                 (id_producto,
                 id_product,
-                id_product_attribute, 
-                ean, 
-                localizacion,              
-                reposicion,                                             
+                id_product_attribute,                
+                reposicion,                             
                 id_employee,
                 nombre_employee,                
                 mensaje_error,
@@ -942,9 +803,7 @@ class AdminLocationManagerController extends ModuleAdminController {
                 VALUES
                 ('$id_producto',
                 $id_product,
-                $id_product_attribute,    
-                '$ean13',
-                '$location',            
+                $id_product_attribute,                
                 '$r_location',                             
                 $id_empleado,
                 '$nombre_empleado',                    
@@ -967,18 +826,18 @@ class AdminLocationManagerController extends ModuleAdminController {
         //creamos array para almacenar los stocks que quiero devolver via ajax para que se actualicen cada vez que se cambia en un producto
         $stock = array();
         //le vamos introduciendo por orden el stock available del producto, luego el físico almacén online (id 1) y el físico tienda física Múgica (id 4)
-        $stock[0] = (int) StockAvailable::getQuantityAvailableByProduct($id_product, $id_product_attribute);
-        $stock[1] = (int) $stock_manager->getProductPhysicalQuantities($id_product, $id_product_attribute, 1,true);
-        $stock[2] = (int) $stock_manager->getProductPhysicalQuantities($id_product, $id_product_attribute, 4,true);   
+        $stock[0] = (int) StockAvailable::getQuantityAvailableByProduct($product[0], $product[1]);
+        $stock[1] = (int) $stock_manager->getProductPhysicalQuantities($product[0], $product[1], 1,true);
+        $stock[2] = (int) $stock_manager->getProductPhysicalQuantities($product[0], $product[1], 4,true);   
         //en $stock metemos tambien el nombre completo del producto, id_product más id_product_attribute
-        $stock[3] = $id_producto;    
+        $stock[3] = $product[0].'_'.$product[1];    
         //Enviamos abajo con ajax el almacén sobre el que se actua para actualizar bien el select
 
 
         //para actualizar si el producto ya tiene ambos almacenes y quitar el label y añadir las opciones de transferencia, miramos que almacenes tiene ahora asignado, si es más de uno es que los tiene y ponemos $todosalmacenes = 1, si no 0.
         //el select tiene que haber cogido valor 5 o 6 y el campo de gestión haber estado vacio:
         if ((($tipo_gestion_stock == 5)||($tipo_gestion_stock == 6))&&($cantidad_a_gestionar == '')){
-            $almacenesasignados = Warehouse::getProductWarehouseList($id_product, $id_product_attribute);
+            $almacenesasignados = Warehouse::getProductWarehouseList($product[0], $product[1]);
 
             $i = 0;
             foreach ($almacenesasignados as $almacen) { //si hay más de un almacén $i irá creciendo, si $i es mayor que 1 enviaremos al ajax que tiene ambos almacenes asignados            

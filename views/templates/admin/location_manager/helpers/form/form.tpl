@@ -200,12 +200,12 @@
 
             //limitamos el tamaño de la imagen para que salgan bien los GIF con width y height
             if(!!product_infos.image && product_infos.image!='')
-                img = '<img itemprop="image" src = "'+product_infos.image+'"  width="98" height="98" />';
+                img = '<img itemprop="image" src = "'+product_infos.image+'"  width="98" height="98"  title="'+product_infos.id+'" />';
 
             // add a new line in the products table
             $('#products_in_search > tbody:last').append(                
                 '<tr>'+
-                '<td><div class="fixed-width-xs">'+product_infos.id_product+'</div></td>'+
+                '<td><div class="fixed-width-xs"  title="'+product_infos.id+'">'+product_infos.id_product+'</div></td>'+
                 '<td><div class="fixed-width-sm">'+img+'</div></td>'+
                 '<td class="text-center"><div class="fixed-width-lg">'+product_infos.reference+'</div></td>'+
                 '<td class="text-center"><div class="fixed-width-lg">'+product_infos.name+'</div></td>'+                
@@ -225,7 +225,7 @@
                 //Añadir botón de impresora etiquetas                
                 '<td><a class="btn" href="#" onclick="printProductLabelOf('+product_infos.id_product+','+product_infos.id_product_attribute+');"><img src="https://lafrikileria.com/modules/directlabelprintproduct/views/img/icon-print.png" style="height:25px"></a></td>'+
                 //'<td><button type="button" id="update|'+product_infos.id+'" class="btn btn-default update"><i class="icon-save"></i> {$i18n.update|escape:'htmlall':'UTF-8'}'+
-                '<td><button type="button" id="update|'+product_infos.id+'" class="btn btn-default update"><i class="icon-save"></i> {$i18n.update|escape:'htmlall':'UTF-8'}'+
+                '<td><button type="button" id="update|'+product_infos.id+'" class="btn btn-default update" title="'+product_infos.id+'"><i class="icon-save"></i> {$i18n.update|escape:'htmlall':'UTF-8'}'+
                 '</button></td></tr>'
             );
             //He credo un input hidden con id escondido_warehouse donde almacenar como valor el id del almacen sobre el que operamos para poder sacarlo luego desde Adminlocationmanager.php con Tools::getValue a la hora de hacer gestión de stock, por eso en el select sacamos también el id_warehouse como idwarehouse.
