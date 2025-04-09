@@ -11,7 +11,7 @@ if (!defined('_PS_VERSION_'))
     exit;
 
 class AdminLocationManagerController extends ModuleAdminController {
-    protected $limit = 1000; //límite de 1000 productos para mostrar
+    protected $limit = 500; //límite de 1000 productos para mostrar
     
     public function __construct() {
         require_once (dirname(__FILE__) .'/../../mblocationmanagermod.php');
@@ -57,7 +57,7 @@ class AdminLocationManagerController extends ModuleAdminController {
         $warehouses = Warehouse::getWarehouses(true); 
 
         //get lista categorías
-        $categories = Category::getCategories((int)($cookie->id_lang), true, false);
+        $categories = Category::getCategories(1, true, false);
 
         if (!$categories || empty($categories))
             $this->displayWarning($this->module->i18n['no_categories_msg']);
@@ -260,13 +260,13 @@ class AdminLocationManagerController extends ModuleAdminController {
         // get ordenación de productos, según la opción elegida en el select, al hacer LEFT JOIN en la consulta con lafrips_stock_available, recogemos quantity disponible
         $id_ordenacion = (int) Tools::getValue('id_ordenacion', false);
         if ($id_ordenacion == 1){
-            $ordenacion = 'p.id_product DESC';
+            $ordenacion = 'pro.id_product DESC';
         }else if ($id_ordenacion == 2){
-            $ordenacion = 'p.id_product ASC';
+            $ordenacion = 'pro.id_product ASC';
         }else if ($id_ordenacion == 3){
-            $ordenacion = 'sa.quantity ASC';
+            $ordenacion = 'ava.quantity ASC';
         }else if ($id_ordenacion == 4){
-            $ordenacion = 'sa.quantity DESC';
+            $ordenacion = 'ava.quantity DESC';
         }else if ($id_ordenacion == 5){ //16/07/2021 ordenar por abc
             $ordenacion = 'con.abc ASC';
         }else if ($id_ordenacion == 6){
@@ -285,7 +285,7 @@ class AdminLocationManagerController extends ModuleAdminController {
         if ((!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1) && ((int)$id_category !== 1)) 
         {
 
-            $where_especifico = 'cp.id_category =' . (int)$id_category ;
+            $where_especifico = 'AND cap.id_category =' . (int)$id_category ;
 
         }
         // 17/06/2021 Si se introduce algo en el input de Pedido para Tienda, queremos que se busque un pedido normal de cliente y se muestren los productos que contiene. Como pueden no tener asignado el almacén tienda, añadimos a la query un where con el id de almacen online, de modo que para ese caso muestra todos
@@ -293,7 +293,7 @@ class AdminLocationManagerController extends ModuleAdminController {
         else if (($pattern_pedido_tienda || $pattern_pedido_tienda !== '' || Tools::strlen($pattern_pedido_tienda) > 1) && ((int)$id_category == 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1)) 
         {
 
-            $where_especifico = '(ode.id_order = ' . $pattern_pedido_tienda . ')'; 
+            $where_especifico = 'AND (ode.id_order = ' . $pattern_pedido_tienda . ')'; 
             $id_warehouse = '(1, 4)';
 
             //activamos el indicador de que la búsqueda será de productos de un pedido para tienda:
@@ -305,42 +305,34 @@ class AdminLocationManagerController extends ModuleAdminController {
         else if (($pattern_pedido || $pattern_pedido !== '' || Tools::strlen($pattern_pedido) > 1) && ((int)$id_category == 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1)) 
         {
 
-            $where_especifico = '(so.reference LIKE \'%' . $pattern_pedido . '%\')';
+            $where_especifico = 'AND (sor.reference LIKE \'%' . $pattern_pedido . '%\')';
 
         }
         //Si se ha introducido algo en la casilla de Producto, manteniendo la categoría Raíz, se busca en los productos la coincidencia de lo buscado con nombre, referencia, referencia de proveedor y ean/upc. Añado AND id_category etc porque con esa busqueda reduce el tiempo a la mitad cuando no se selecciona ninguna categoría ¿? 
         else if (($pattern_producto || $pattern_producto !== '' || Tools::strlen($pattern_producto) > 1) && ((int)$id_category == 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1))
         {
 
-            $where_especifico = '(pa.upc LIKE \'%' . $pattern_producto
-                    . '%\' OR pa.reference LIKE \'%' . $pattern_producto
-                    . '%\' OR ps.product_supplier_reference LIKE \'%' . $pattern_producto
-                    . '%\' OR p.ean13 LIKE \'%' . $pattern_producto
-                    . '%\' OR pa.ean13 LIKE \'%' . $pattern_producto
-                    . '%\' OR p.upc LIKE \'%' . $pattern_producto
-                    . '%\' OR p.reference LIKE \'%' . $pattern_producto
-                    . '%\' OR pl.name LIKE \'%' . $pattern_producto
-                    . '%\') AND cp.id_category IN (SELECT id_category FROM lafrips_category)';
+            $where_especifico = 'AND (pat.reference LIKE \'%' . $pattern_producto . '%\' 
+                    OR psu.product_supplier_reference LIKE \'%' . $pattern_producto . '%\' 
+                    OR pro.ean13 LIKE \'%' . $pattern_producto . '%\' 
+                    OR pat.ean13 LIKE \'%' . $pattern_producto . '%\' 
+                    OR pro.reference LIKE \'%' . $pattern_producto . '%\' 
+                    OR pla.name LIKE \'%' . $pattern_producto. '%\') 
+                    AND cap.id_category IN (SELECT id_category FROM lafrips_category)';
 
         }
         //16/07/2021 Cambiamos, colocamos nuevo input y las búsquedas de localización estarán separadas, ahora hay un input para localización y itro para localización de reposición
         //Si se introduce algo en la casilla localización manteniendo categoría raíz, se busca lo introducido en la tabla de lafrips_warehouse_product_location para localización de almacén y en mi tabla lafrips_localizaciones para localización de reposición. 
         else if (($pattern_localizacion || $pattern_localizacion !== '' || Tools::strlen($pattern_localizacion) > 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1) && ((int)$id_category == 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1)) 
-        {
-
-            // $where_especifico = '(pw.location LIKE \'' . $pattern_localizacion
-            //         . '%\') OR (fl.r_location LIKE \'' . $pattern_localizacion
-            //         . '%\')';
-            $where_especifico = 'pw.location LIKE \'' . $pattern_localizacion
-                    . '%\'';
+        {            
+            $where_especifico = 'AND wpl.location LIKE \'' . $pattern_localizacion . '%\'';
 
          }
 
          else if (($pattern_reposicion || $pattern_reposicion !== '' || Tools::strlen($pattern_reposicion) > 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && ((int)$id_category == 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1)) 
         {
 
-            $where_especifico = 'fl.r_location LIKE \'' . $pattern_reposicion
-                    . '%\'';
+            $where_especifico = 'AND loc.r_location LIKE \'' . $pattern_reposicion . '%\'';
 
          }
 
@@ -348,15 +340,13 @@ class AdminLocationManagerController extends ModuleAdminController {
         else if (($pattern_producto || $pattern_producto !== '' || Tools::strlen($pattern_producto) > 1) && ((int)$id_category !== 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1))
         {
 
-            $where_especifico = '(pa.upc LIKE \'%' . $pattern_producto
-                    . '%\' OR pa.reference LIKE \'%' . $pattern_producto
-                    . '%\' OR ps.product_supplier_reference LIKE \'%' . $pattern_producto
-                    . '%\' OR p.ean13 LIKE \'%' . $pattern_producto
-                    . '%\' OR pa.ean13 LIKE \'%' . $pattern_producto
-                    . '%\' OR p.upc LIKE \'%' . $pattern_producto
-                    . '%\' OR p.reference LIKE \'%' . $pattern_producto
-                    . '%\' OR pl.name LIKE \'%' . $pattern_producto
-                    . '%\') AND cp.id_category = ' . (int)$id_category;
+            $where_especifico = 'AND (pat.reference LIKE \'%' . $pattern_producto . '%\' 
+                    OR psu.product_supplier_reference LIKE \'%' . $pattern_producto . '%\' 
+                    OR pro.ean13 LIKE \'%' . $pattern_producto . '%\' 
+                    OR pat.ean13 LIKE \'%' . $pattern_producto . '%\' 
+                    OR pro.reference LIKE \'%' . $pattern_producto . '%\' 
+                    OR pla.name LIKE \'%' . $pattern_producto. '%\')
+                    AND cap.id_category = ' . (int)$id_category;
 
         }
         else //Si hay cosas en varias casillas etc se pide limpiar el formulario
@@ -366,75 +356,222 @@ class AdminLocationManagerController extends ModuleAdminController {
 
         //16/07/2021 preparamos where para cuando se quiere filtrar abc con el nuevo select        
         if ($clas_abc == 1) {
-            $where_especifico_abc = 'con.abc = "A"';
+            $where_especifico_abc = 'AND con.abc = "A"';
         } else if ($clas_abc == 2) {
-            $where_especifico_abc = 'con.abc = "B"';
+            $where_especifico_abc = 'AND con.abc = "B"';
         } else if ($clas_abc == 3) {
-            $where_especifico_abc = 'con.abc = "C"';
+            $where_especifico_abc = 'AND con.abc = "C"';
         } else {
             $where_especifico_abc = '';
         }
 
         //20/05/2021 obtenemos los días que un producto es considerado novedad (clasificación B) desde lafrips_configuration
         // 10/06/2021 ahora se guarda en lafrips_cosnumos campo novedad
-        // $novedad = (int)Configuration::get('CLASIFICACIONABC_NOVEDAD', 0);
+        // $novedad = (int)Configuration::get('CLASIFICACIONABC_NOVEDAD', 0);            
 
-        //Consulta de busqueda de productos, no queremos ni packs antiguos (cache_is_pack=1) ni packs de módulo advanced packs
-            $query = new DbQuery();
-            $query->select('
-                    CONCAT(p.id_product, \'_\', IFNULL(pa.id_product_attribute, \'0\')) as id,
-                    p.id_product,
-                    p.cache_is_pack as es_pack,
-                    IFNULL(pa.id_product_attribute, 0) as id_product_attribute,
-                    IFNULL(pai.id_image, IFNULL(i.id_image, 0)) as id_image,
-                    IFNULL(pa.reference, IFNULL(p.reference, \'\')) as reference,
-                    IFNULL(ps.product_supplier_reference,\'\') as supplier_reference,
-                    IFNULL(pa.ean13, IFNULL(p.ean13, \'\')) as ean13,
-                    IFNULL(pa.upc, IFNULL(p.upc, \'\')) as upc,
-                    pw.id_warehouse as idwarehouse,
-                    IFNULL(pw.location, \'\') as location,                    
-                    IFNULL(fl.r_location, \'\') as r_location,                    
-                    pl.link_rewrite,
-                    sa.out_of_stock as out_of_stock,
-                    con.consumo as consumo,
-                    con.abc as clasificacion_abc,
-                    con.novedad as novedad,
-                    IFNULL(CONCAT(pl.name, \' : \', GROUP_CONCAT(DISTINCT agl.name, \' - \', al.name order by agl.name SEPARATOR \', \')), pl.name) as name
-            ');
-            $query->from('product', 'p');
-            $query->join(Shop::addSqlAssociation('product', 'p'));
-            $query->innerJoin('product_lang', 'pl', 'pl.id_product = p.id_product AND pl.id_lang = ' . $id_lang);
-            $query->leftJoin('category_product', 'cp', 'cp.id_product = p.id_product');               
-            $query->leftJoin('image', 'i', 'i.id_product = p.id_product AND i.cover = 1');
-            $query->leftJoin('product_attribute', 'pa', 'pa.id_product = p.id_product');
-            $query->leftJoin('product_attribute_image', 'pai', 'pai.id_product_attribute = pa.id_product_attribute');
-            $query->leftJoin('product_attribute_combination', 'pac', 'pac.id_product_attribute = pa.id_product_attribute');
-            $query->leftJoin('supply_order_detail', 'od', 'od.id_product = p.id_product AND od.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');
-            $query->leftJoin('supply_order', 'so', 'so.id_supply_order = od.id_supply_order');
-            $query->leftJoin('attribute', 'atr', 'atr.id_attribute = pac.id_attribute');
-            $query->leftJoin('attribute_lang', 'al', 'al.id_attribute = atr.id_attribute AND al.id_lang = ' . $id_lang);
-            $query->leftJoin('attribute_group_lang', 'agl', 'agl.id_attribute_group = atr.id_attribute_group AND agl.id_lang = ' . $id_lang);
-            $query->leftJoin('warehouse_product_location', 'pw', 'pw.id_product = p.id_product AND pw.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');
-            $query->leftJoin('localizaciones', 'fl', 'fl.id_product = p.id_product AND fl.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');
-            $query->leftJoin('product_supplier', 'ps', 'ps.id_product = p.id_product AND ps.id_product_attribute = IFNULL(pa.id_product_attribute, 0)'); 
-            $query->leftJoin('stock_available', 'sa', 'sa.id_product = p.id_product AND sa.id_product_attribute = IFNULL(pa.id_product_attribute, 0)');  
-            $query->leftJoin('consumos', 'con', 'con.id_product = p.id_product AND con.id_product_attribute = sa.id_product_attribute');     
-            $query->leftJoin('order_detail', 'ode', 'ode.product_id = p.id_product AND ode.product_attribute_id = sa.id_product_attribute');      
-            $query->where('p.id_product NOT IN (SELECT pd.id_product FROM `' . _DB_PREFIX_ . 'product_download` pd WHERE (pd.id_product = p.id_product))');
-            $query->where('p.id_product NOT IN (SELECT adp.id_pack FROM `' . _DB_PREFIX_ . 'pm_advancedpack` adp WHERE (adp.id_pack = p.id_product))');
-            $query->where('p.is_virtual = 0 AND p.cache_is_pack = 0');
-            //$query->where('p.is_virtual = 0');
-            // $query->where('pw.id_warehouse = ' . (int)$id_warehouse);
-            $query->where('pw.id_warehouse IN ' . $id_warehouse);
-            //$query->where('cp.id_category = ' . (int)$id_category);
-            $query->where($where_especifico);
-            //16/07/2021 where para abc
-            $query->where($where_especifico_abc);
-            $query->groupBy('p.id_product, pa.id_product_attribute');
-            $query->orderBy($ordenacion);
-            $query->limit($this->limit);
-            $items = Db::getInstance(_PS_USE_SQL_SLAVE_)->executeS($query); 
+            //09/04/2025 Nueva consulta
+            // $sql_busqueda = "SELECT 
+            //     CONCAT(pro.id_product, '_', IFNULL(pat.id_product_attribute, '0')) AS id,
+            //     pro.id_product,
+            //     pro.cache_is_pack AS es_pack,
+            //     IFNULL(pat.id_product_attribute, 0) AS id_product_attribute,
+            //     IFNULL(pai.id_image, IFNULL(ima.id_image, 0)) AS id_image,
+            //     IFNULL(pat.reference, IFNULL(pro.reference, '')) AS reference,
+            //     IFNULL(psu.product_supplier_reference, '') AS supplier_reference,
+            //     IFNULL(pat.ean13, IFNULL(pro.ean13, '')) AS ean13,  
+            //     IFNULL(wpl.id_warehouse, 0) AS idwarehouse,
+            //     IFNULL(wpl.location, '') AS location,
+            //     IFNULL(loc.r_location, '') AS r_location,
+            //     pla.link_rewrite,
+            //     IFNULL(ava.out_of_stock, 0) AS out_of_stock,
+            //     IFNULL(con.consumo, 0) AS consumo,
+            //     IFNULL(con.abc, '') AS clasificacion_abc,
+            //     IFNULL(con.novedad, 0) AS novedad,
+            //     IFNULL(
+            //         CONCAT(pla.name, ' : ', 
+            //         GROUP_CONCAT(DISTINCT CONCAT(agl.name, ' - ', atl.name) ORDER BY agl.name SEPARATOR ', ')
+            //         ), 
+            //         pla.name
+            //     ) AS name
 
+            //     FROM lafrips_product pro
+            //     JOIN lafrips_product_lang pla 
+            //         ON pla.id_product = pro.id_product 
+            //         AND pla.id_lang = 1
+            //     LEFT JOIN lafrips_category_product cap 
+            //         ON cap.id_product = pro.id_product
+            //     LEFT JOIN lafrips_image ima 
+            //         ON ima.id_product = pro.id_product 
+            //         AND ima.cover = 1
+            //     LEFT JOIN lafrips_product_attribute pat 
+            //         ON pat.id_product = pro.id_product
+            //     LEFT JOIN lafrips_product_attribute_image pai 
+            //         ON pai.id_product_attribute = pat.id_product_attribute
+            //     LEFT JOIN lafrips_product_attribute_combination pac 
+            //         ON pac.id_product_attribute = pat.id_product_attribute
+            //     LEFT JOIN lafrips_attribute atr 
+            //         ON atr.id_attribute = pac.id_attribute
+            //     LEFT JOIN lafrips_attribute_lang atl 
+            //         ON atl.id_attribute = atr.id_attribute 
+            //         AND atl.id_lang = 1
+            //     LEFT JOIN lafrips_attribute_group_lang agl 
+            //         ON agl.id_attribute_group = atr.id_attribute_group 
+            //         AND agl.id_lang = 1
+            //     LEFT JOIN lafrips_supply_order_detail sod 
+            //         ON sod.id_product = pro.id_product 
+            //         AND sod.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+            //     LEFT JOIN lafrips_supply_order sor 
+            //         ON sor.id_supply_order = sod.id_supply_order
+            //     LEFT JOIN lafrips_warehouse_product_location wpl 
+            //         ON wpl.id_product = pro.id_product 
+            //         AND wpl.id_product_attribute = IFNULL(pat.id_product_attribute, 0) 
+            //         AND wpl.id_warehouse = 1
+            //     LEFT JOIN lafrips_localizaciones loc 
+            //         ON loc.id_product = pro.id_product 
+            //         AND loc.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+            //     LEFT JOIN lafrips_product_supplier psu 
+            //         ON psu.id_product = pro.id_product 
+            //         AND psu.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+            //     LEFT JOIN lafrips_stock_available ava 
+            //         ON ava.id_product = pro.id_product 
+            //         AND ava.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+            //     LEFT JOIN lafrips_consumos con 
+            //         ON con.id_product = pro.id_product 
+            //         AND con.id_product_attribute = IFNULL(ava.id_product_attribute, 0)
+            //     LEFT JOIN lafrips_order_detail ode 
+            //         ON ode.product_id = pro.id_product 
+            //         AND ode.product_attribute_id = IFNULL(ava.id_product_attribute, 0)
+
+            //     WHERE 
+            //     pro.is_virtual = 0
+            //     AND wpl.id_warehouse = 1
+            //     AND pro.cache_is_pack = 0
+            //     $where_especifico
+            //     $where_especifico_abc
+            //     GROUP BY pro.id_product, pat.id_product_attribute
+            //     ORDER BY $ordenacion
+            //     LIMIT ".$this->limit;
+
+                $sql_busqueda_inicial = "SELECT                     
+                    pro.id_product,  
+                    ava.id_product_attribute 
+                FROM lafrips_product pro
+                    JOIN lafrips_product_lang pla 
+                        ON pla.id_product = pro.id_product 
+                        AND pla.id_lang = 1
+                    LEFT JOIN lafrips_stock_available ava 
+                        ON pro.id_product = ava.id_product
+                    LEFT JOIN lafrips_category_product cap 
+                        ON cap.id_product = pro.id_product
+                    LEFT JOIN lafrips_product_attribute pat 
+                        ON pat.id_product = pro.id_product
+                        AND pat.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_product_supplier psu 
+                        ON psu.id_product = pro.id_product 
+                        AND psu.id_product_attribute = ava.id_product_attribute
+                WHERE 
+                    pro.is_virtual = 0
+                    AND pro.cache_is_pack = 0
+                    AND ( 
+                        IF(EXISTS(SELECT id_product FROM lafrips_product_attribute WHERE id_product = ava.id_product) AND (ava.id_product_attribute = 0), 0, 1)
+                    )
+                    $where_especifico
+                    $where_especifico_abc
+                    GROUP BY pro.id_product, ava.id_product_attribute
+                    ORDER BY $ordenacion
+                    LIMIT ".$this->limit;
+
+
+// die(Tools::jsonEncode(array('error'=> true, 'message'=>(string)$sql_busqueda_inicial)));
+
+                $solo_ids_productos = Db::getInstance()->executeS($sql_busqueda_inicial); 
+
+                $sql_busqueda_completa = "SELECT 
+                CONCAT(pro.id_product, '_', IFNULL(pat.id_product_attribute, '0')) AS id,
+                pro.id_product,
+                pro.cache_is_pack AS es_pack,
+                IFNULL(pat.id_product_attribute, 0) AS id_product_attribute,
+                IFNULL(pai.id_image, IFNULL(ima.id_image, 0)) AS id_image,
+                IFNULL(pat.reference, IFNULL(pro.reference, '')) AS reference,
+                IFNULL(psu.product_supplier_reference, '') AS supplier_reference,
+                IFNULL(pat.ean13, IFNULL(pro.ean13, '')) AS ean13,  
+                IFNULL(wpl.id_warehouse, 0) AS idwarehouse,
+                IFNULL(wpl.location, '') AS location,
+                IFNULL(loc.r_location, '') AS r_location,
+                pla.link_rewrite,
+                IFNULL(ava.out_of_stock, 0) AS out_of_stock,
+                IFNULL(con.consumo, 0) AS consumo,
+                IFNULL(con.abc, '') AS clasificacion_abc,
+                IFNULL(con.novedad, 0) AS novedad,
+                IFNULL(
+                    CONCAT(pla.name, ' : ', 
+                    GROUP_CONCAT(DISTINCT CONCAT(agl.name, ' - ', atl.name) ORDER BY agl.name SEPARATOR ', ')
+                    ), 
+                    pla.name
+                ) AS name
+
+                FROM lafrips_product pro
+                JOIN lafrips_product_lang pla 
+                    ON pla.id_product = pro.id_product 
+                    AND pla.id_lang = 1
+                LEFT JOIN lafrips_category_product cap 
+                    ON cap.id_product = pro.id_product
+                LEFT JOIN lafrips_image ima 
+                    ON ima.id_product = pro.id_product 
+                    AND ima.cover = 1
+                LEFT JOIN lafrips_product_attribute pat 
+                    ON pat.id_product = pro.id_product
+                LEFT JOIN lafrips_product_attribute_image pai 
+                    ON pai.id_product_attribute = pat.id_product_attribute
+                LEFT JOIN lafrips_product_attribute_combination pac 
+                    ON pac.id_product_attribute = pat.id_product_attribute
+                LEFT JOIN lafrips_attribute atr 
+                    ON atr.id_attribute = pac.id_attribute
+                LEFT JOIN lafrips_attribute_lang atl 
+                    ON atl.id_attribute = atr.id_attribute 
+                    AND atl.id_lang = 1
+                LEFT JOIN lafrips_attribute_group_lang agl 
+                    ON agl.id_attribute_group = atr.id_attribute_group 
+                    AND agl.id_lang = 1
+                LEFT JOIN lafrips_supply_order_detail sod 
+                    ON sod.id_product = pro.id_product 
+                    AND sod.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                LEFT JOIN lafrips_supply_order sor 
+                    ON sor.id_supply_order = sod.id_supply_order
+                LEFT JOIN lafrips_warehouse_product_location wpl 
+                    ON wpl.id_product = pro.id_product 
+                    AND wpl.id_product_attribute = IFNULL(pat.id_product_attribute, 0) 
+                    AND wpl.id_warehouse = 1
+                LEFT JOIN lafrips_localizaciones loc 
+                    ON loc.id_product = pro.id_product 
+                    AND loc.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                LEFT JOIN lafrips_product_supplier psu 
+                    ON psu.id_product = pro.id_product 
+                    AND psu.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                LEFT JOIN lafrips_stock_available ava 
+                    ON ava.id_product = pro.id_product 
+                    AND ava.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                LEFT JOIN lafrips_consumos con 
+                    ON con.id_product = pro.id_product 
+                    AND con.id_product_attribute = IFNULL(ava.id_product_attribute, 0)
+                LEFT JOIN lafrips_order_detail ode 
+                    ON ode.product_id = pro.id_product 
+                    AND ode.product_attribute_id = IFNULL(ava.id_product_attribute, 0) ";
+
+                $where = "WHERE (pro.id_product, IFNULL(pat.id_product_attribute, 0)) IN (";
+
+                foreach ($solo_ids_productos as $pair) {
+                    $id_product = (int)$pair['id_product'];
+                    $id_product_attribute = (int)$pair['id_product_attribute'];
+                    $where .= "($id_product, $id_product_attribute),";
+                }
+
+                $where = rtrim($where, ',') . ") GROUP BY pro.id_product, ava.id_product_attribute";
+
+        // die(Tools::jsonEncode(array('error'=> true, 'message'=>$sql_busqueda_completa.$where)));
+
+                $items = Db::getInstance()->executeS($sql_busqueda_completa.$where);
+           
         
         $stock_manager = new StockManager();
         //crear una variable smarty para sacar en el tpl el número de productos
@@ -483,6 +620,7 @@ class AdminLocationManagerController extends ModuleAdminController {
             $item['phy_quantity_fisica'] = (int) $stock_manager->getProductPhysicalQuantities($ids[0], $ids[1], 4,true);  //stock físico tienda física
             $almacenes = Warehouse::getProductWarehouseList($ids[0], $ids[1]);  //almacenes activos del producto (si solo tiene uno, en tpl no daremos opción a transferir stock) Esto consulta en la tabla warehouse_product_location, por lo que no importa si tiene o ha tenido stock en los almacenes, se da por defecto id_shop ya que solo hay una de momento. Si no tiene ningún almacén asignado, no puede salir en el localizador.
             $i = 0;
+            $item['almacenAsignado'][$i] = 0;
             foreach ($almacenes as $almacen) { //si hay más de un almacén $i irá creciendo, almacenAsignado guardamos los almacenes que el producto tiene asignados, esto lo usaremos en form.tpl solo si solo tiene un almacén asignado, para ofrecer la opción de asignar el otro, por lo tanto, cuando solo tiene uno asignado, estará almacenado en $item['alamacenAsignado']                
                 $item['almacenAsignado'][$i] = (int)$almacen['id_warehouse'];
                 $i++;
@@ -494,6 +632,22 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $item['almacenes'] = 0;
             }
             //$this->displayWarning($item['almacenes']);
+
+            //13/12/2023 Añadimos a cada producto la última localizacion diferente a la actual, si existe, buscando en lafrips_localizaciones_log
+            $sql_last_location = "SELECT localizacion FROM lafrips_localizaciones_log
+            WHERE localizacion != ''
+            AND localizacion != '".$item['location']."'
+            AND id_product = ".$item['id_product']."
+            AND id_product_attribute = ".$item['id_product_attribute']."
+            ORDER BY id_localizaciones_log DESC";
+
+            $last_location = Db::getInstance()->getValue($sql_last_location);
+
+            if ($last_location == '' || is_null($last_location)) {
+                $item['last_location'] = 'Sin datos';
+            } else {
+                $item['last_location'] = $last_location;
+            }
 
             //PROVISIONAL PARA TRANSFERIR A ALMACEN TIENDA FISICA 20/02/2019
                 //Para facilitar el paso del stock de tienda fisica al almacén de tienda física y que no tengan que meterse al producto para marcar el almacén como activo, voy a añadir un check que, si se marca, al actualizar meta el producto y atributo en dicho almacén (pero solo el atributo en el que estemos, lógicamente). Para ello primero se comprueba que el producto + atributo no esté ya en el almacén, en este caso Tienda (id_warehouse = 3) Ignoraremos el parámetro location, ya que no vamos a usar localizaciones en tienda física. Estas funciones salen de AdminProductsController.php (línea aprox 3175)

@@ -34,7 +34,7 @@
                     <th class="fixed-width-xs"><span class="title_box">{$i18n.phy_quantity_fisica|escape:'htmlall':'UTF-8'}</span></th>
                     <th class="fixed-width-xs"><span class="title_box">Permite<br>pedidos</span></th>
                     <th class="text-center"><span class="title_box">{$i18n.gestion_stock|escape:'htmlall':'UTF-8'}</span></th>
-                    {* 27/03/2025 quitamos botón <th class="fixed-width-xs text-center"><span class="title">Imprimir Etiquetas</span></th> *}
+                    <th class="fixed-width-xs text-center"><span class="title">Imprimir Etiquetas</span></th>
                     <th class="fixed-width-sm">&nbsp;</th>
                 </tr>
             </thead>
@@ -88,12 +88,7 @@
                             var almacenes = '<option value="6">Asignar almacén Tienda Online</option>';
                             var noAsignadoTienda = '';
                             var noAsignadoOnline = '<label id="label_tienda_online_'+product_infos.id+'" for="fisica_online_'+product_infos.id+'">Almacén NO asignado</label>';                        
-                        }  else if (product_infos.almacenAsignado[0] == 0){  //09/04/2025 no tienen asignado ningún almacén, hasta que modifique el módulo ya que ya no trabajamos con tienda, pongo mensaje
-                            var operaciones = '';
-                            var almacenes = '<option value="6">Asignar almacén Tienda Online</option>';
-                            var noAsignadoTienda = '<label id="label_tienda_fisica_'+product_infos.id+'" for="fisica_tienda_'+product_infos.id+'">Almacén NO asignado</label>';
-                            var noAsignadoOnline = '<label id="label_tienda_online_'+product_infos.id+'" for="fisica_online_'+product_infos.id+'">Almacén NO asignado</label>';                        
-                        }                      
+                        }                    
                     }
 
                     //aqui forzamos los datos para que opere sobre el almacén Tienda, id_warehouse 4
@@ -132,11 +127,7 @@
                             var almacenes = '<option value="6">Asignar almacén Tienda Online</option>';
                             var noAsignadoTienda = '';
                             var noAsignadoOnline = '<label id="label_tienda_online_'+product_infos.id+'" for="fisica_online_'+product_infos.id+'">Almacén NO asignado</label>';                        
-                        }  else if (product_infos.almacenAsignado[0] == 0){  //09/04/2025 no tienen asignado ningún almacén, hasta que modifique el módulo ya que ya no trabajamos con tienda, pongo mensaje                            
-                            var almacenes = '<option value="6">Asignar almacén Tienda Online</option>';
-                            var noAsignadoTienda = '<label id="label_tienda_fisica_'+product_infos.id+'" for="fisica_tienda_'+product_infos.id+'">Almacén NO asignado</label>';
-                            var noAsignadoOnline = '<label id="label_tienda_online_'+product_infos.id+'" for="fisica_online_'+product_infos.id+'">Almacén NO asignado</label>';                        
-                        }                   
+                        }                    
                     }
 
                     //Para evitar confusión, al select de añadir o quitar stock le añadimos a que almacén va dirigido el stock a añadir o quitar. Si el almacén seleccionado en el select principal arriba es almacén tienda física múgica, el stock que se manipula es el de tienda física, si es online será ese.
@@ -173,12 +164,11 @@
             }
 
             //Si hacemos la busqueda en el almacén tienda física múgica (id=4) no queremos que nos muestre la localización de picking ni reposición ya que no la usamos, mostraremos TIENDA en lugar de la casilla de formulario
-            //13/12/2023 Ponemos debajo la última localización, si la hay. Lo del span
             if (product_infos.idwarehouse == 1) {
-                var local_pic = '<td><div class="input-group fixed-width-md text-center"><input type="text" name="input_location_'+product_infos.id+'" value="'+product_infos.location+'" /><br><span>('+product_infos.last_location+')</span></div></td>';
+                var local_pic = '<td><div class="input-group fixed-width-md"><input type="text" name="input_location_'+product_infos.id+'" value="'+product_infos.location+'" /></div></td>';
                 var local_rep = '<td><div class="input-group fixed-width-md"><input type="text" name="input_r_location_'+product_infos.id+'" value="'+product_infos.r_location+'" /></div></td>';
             } else {
-                var local_pic = local_rep = '<td><div class="form-group fixed-width-md" style="margin: 0 auto; float: none;">NO ALMACÉN</div></td>';
+                var local_pic = local_rep = '<td><div class="form-group fixed-width-md" style="margin: 0 auto; float: none;">TIENDA</div></td>';
             }
 
             //En la columna Disponible, con el stock total disponible, queremos poner entre paréntesis el stock online disponible, que es el resultado de restar al disponible total el stock de tienda física. Será diferente de la suma de ambos stocks físicos si el producto está en algún pedido
@@ -232,10 +222,8 @@
                 '<td class="text-center"><span id="fisica_tienda_'+product_infos.id+'">'+product_infos.phy_quantity_fisica+'</span>'+noAsignadoTienda+'</td>'+
                 '<td class="text-center">'+permite_pedido+'</td>'+
                 gestionStock+
-                //Añadir botón de impresora etiquetas  
-                //27/03/2025 lo quitamos              
-                //'<td><a class="btn" href="#" onclick="printProductLabelOf('+product_infos.id_product+','+product_infos.id_product_attribute+');"><img src="https://lafrikileria.com/modules/directlabelprintproduct/views/img/icon-print.png" style="height:25px"></a></td>'+
-
+                //Añadir botón de impresora etiquetas                
+                '<td><a class="btn" href="#" onclick="printProductLabelOf('+product_infos.id_product+','+product_infos.id_product_attribute+');"><img src="https://lafrikileria.com/modules/directlabelprintproduct/views/img/icon-print.png" style="height:25px"></a></td>'+
                 //'<td><button type="button" id="update|'+product_infos.id+'" class="btn btn-default update"><i class="icon-save"></i> {$i18n.update|escape:'htmlall':'UTF-8'}'+
                 '<td><button type="button" id="update|'+product_infos.id+'" class="btn btn-default update" title="'+product_infos.id+'"><i class="icon-save"></i> {$i18n.update|escape:'htmlall':'UTF-8'}'+
                 '</button></td></tr>'
