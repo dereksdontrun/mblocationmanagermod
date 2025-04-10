@@ -455,12 +455,12 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $sql_busqueda_inicial = "SELECT                     
                     pro.id_product,  
                     ava.id_product_attribute 
-                FROM lafrips_product pro
+                FROM lafrips_stock_available ava 
+                    JOIN lafrips_product pro
+	                    ON pro.id_product = ava.id_product
                     JOIN lafrips_product_lang pla 
                         ON pla.id_product = pro.id_product 
-                        AND pla.id_lang = 1
-                    LEFT JOIN lafrips_stock_available ava 
-                        ON pro.id_product = ava.id_product
+                        AND pla.id_lang = 1                    
                     LEFT JOIN lafrips_category_product cap 
                         ON cap.id_product = pro.id_product
                     LEFT JOIN lafrips_product_attribute pat 
@@ -487,11 +487,11 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $solo_ids_productos = Db::getInstance()->executeS($sql_busqueda_inicial); 
 
                 $sql_busqueda_completa = "SELECT 
-                CONCAT(pro.id_product, '_', IFNULL(pat.id_product_attribute, '0')) AS id,
+                CONCAT(pro.id_product, '_', ava.id_product_attribute) AS id,
                 pro.id_product,
                 pro.cache_is_pack AS es_pack,
-                IFNULL(pat.id_product_attribute, 0) AS id_product_attribute,
-                IFNULL(pai.id_image, IFNULL(ima.id_image, 0)) AS id_image,
+                ava.id_product_attribute AS id_product_attribute,
+                IFNULL(ima.id_image, 0) AS id_image,
                 IFNULL(pat.reference, IFNULL(pro.reference, '')) AS reference,
                 IFNULL(psu.product_supplier_reference, '') AS supplier_reference,
                 IFNULL(pat.ean13, IFNULL(pro.ean13, '')) AS ean13,  
@@ -510,7 +510,9 @@ class AdminLocationManagerController extends ModuleAdminController {
                     pla.name
                 ) AS name
 
-                FROM lafrips_product pro
+                FROM lafrips_stock_available ava 
+                JOIN lafrips_product pro
+                    ON pro.id_product = ava.id_product	
                 JOIN lafrips_product_lang pla 
                     ON pla.id_product = pro.id_product 
                     AND pla.id_lang = 1
@@ -521,10 +523,9 @@ class AdminLocationManagerController extends ModuleAdminController {
                     AND ima.cover = 1
                 LEFT JOIN lafrips_product_attribute pat 
                     ON pat.id_product = pro.id_product
-                LEFT JOIN lafrips_product_attribute_image pai 
-                    ON pai.id_product_attribute = pat.id_product_attribute
+                    AND pat.id_product_attribute = ava.id_product_attribute	
                 LEFT JOIN lafrips_product_attribute_combination pac 
-                    ON pac.id_product_attribute = pat.id_product_attribute
+                    ON pac.id_product_attribute = ava.id_product_attribute
                 LEFT JOIN lafrips_attribute atr 
                     ON atr.id_attribute = pac.id_attribute
                 LEFT JOIN lafrips_attribute_lang atl 
@@ -535,30 +536,27 @@ class AdminLocationManagerController extends ModuleAdminController {
                     AND agl.id_lang = 1
                 LEFT JOIN lafrips_supply_order_detail sod 
                     ON sod.id_product = pro.id_product 
-                    AND sod.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                    AND sod.id_product_attribute = ava.id_product_attribute
                 LEFT JOIN lafrips_supply_order sor 
                     ON sor.id_supply_order = sod.id_supply_order
                 LEFT JOIN lafrips_warehouse_product_location wpl 
                     ON wpl.id_product = pro.id_product 
-                    AND wpl.id_product_attribute = IFNULL(pat.id_product_attribute, 0) 
+                    AND wpl.id_product_attribute = ava.id_product_attribute
                     AND wpl.id_warehouse = 1
                 LEFT JOIN lafrips_localizaciones loc 
                     ON loc.id_product = pro.id_product 
-                    AND loc.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                    AND loc.id_product_attribute = ava.id_product_attribute
                 LEFT JOIN lafrips_product_supplier psu 
                     ON psu.id_product = pro.id_product 
-                    AND psu.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
-                LEFT JOIN lafrips_stock_available ava 
-                    ON ava.id_product = pro.id_product 
-                    AND ava.id_product_attribute = IFNULL(pat.id_product_attribute, 0)
+                    AND psu.id_product_attribute = ava.id_product_attribute
                 LEFT JOIN lafrips_consumos con 
                     ON con.id_product = pro.id_product 
-                    AND con.id_product_attribute = IFNULL(ava.id_product_attribute, 0)
+                    AND con.id_product_attribute = ava.id_product_attribute
                 LEFT JOIN lafrips_order_detail ode 
                     ON ode.product_id = pro.id_product 
-                    AND ode.product_attribute_id = IFNULL(ava.id_product_attribute, 0) ";
+                    AND ode.product_attribute_id = ava.id_product_attribute ";
 
-                $where = "WHERE (pro.id_product, IFNULL(pat.id_product_attribute, 0)) IN (";
+                $where = "WHERE (pro.id_product, ava.id_product_attribute) IN (";
 
                 foreach ($solo_ids_productos as $pair) {
                     $id_product = (int)$pair['id_product'];
