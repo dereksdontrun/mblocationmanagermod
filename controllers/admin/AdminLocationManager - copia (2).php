@@ -264,9 +264,9 @@ class AdminLocationManagerController extends ModuleAdminController {
         // get ordenación de productos, según la opción elegida en el select, al hacer LEFT JOIN en la consulta con lafrips_stock_available, recogemos quantity disponible
         $id_ordenacion = (int) Tools::getValue('id_ordenacion', false);
         if ($id_ordenacion == 1){
-            $ordenacion = 'ava.id_product DESC';
+            $ordenacion = 'pro.id_product DESC';
         }else if ($id_ordenacion == 2){
-            $ordenacion = 'ava.id_product ASC';
+            $ordenacion = 'pro.id_product ASC';
         }else if ($id_ordenacion == 3){
             $ordenacion = 'ava.quantity ASC';
         }else if ($id_ordenacion == 4){
@@ -290,8 +290,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND cap.id_category =' . (int)$id_category ;
-            $joins = ' LEFT JOIN lafrips_category_product cap 
-		                ON cap.id_product = ava.id_product ';
 
         }
         // 17/06/2021 Si se introduce algo en el input de Pedido para Tienda, queremos que se busque un pedido normal de cliente y se muestren los productos que contiene. Como pueden no tener asignado el almacén tienda, añadimos a la query un where con el id de almacen online, de modo que para ese caso muestra todos
@@ -300,9 +298,10 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND (ode.id_order = ' . $pattern_pedido_tienda . ')'; 
-            $joins = ' LEFT JOIN lafrips_order_detail ode 
-                        ON ode.product_id = ava.id_product 
-                        AND ode.product_attribute_id = ava.id_product_attribute ';
+            // $id_warehouse = '(1, 4)';
+
+            //activamos el indicador de que la búsqueda será de productos de un pedido para tienda:
+            // $pedido_para_tienda = 1;
                 
 
         }
@@ -311,11 +310,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND (sor.reference LIKE \'%' . $pattern_pedido . '%\')';
-            $joins = ' LEFT JOIN lafrips_supply_order_detail sod 
-                            ON sod.id_product = ava.id_product 
-                            AND sod.id_product_attribute = ava.id_product_attribute
-                        LEFT JOIN lafrips_supply_order sor 
-                            ON sor.id_supply_order = sod.id_supply_order ';
 
         }
         //Si se ha introducido algo en la casilla de Producto, manteniendo la categoría Raíz, se busca en los productos la coincidencia de lo buscado con nombre, referencia, referencia de proveedor y ean/upc. Añado AND id_category etc porque con esa busqueda reduce el tiempo a la mitad cuando no se selecciona ninguna categoría ¿? 
@@ -330,28 +324,12 @@ class AdminLocationManagerController extends ModuleAdminController {
                     OR pla.name LIKE \'%' . $pattern_producto. '%\') 
                     AND cap.id_category IN (SELECT id_category FROM lafrips_category)';
 
-            $joins = ' JOIN lafrips_product_lang pla 
-                            ON pla.id_product = ava.id_product 
-                            AND pla.id_lang = 1	
-                        LEFT JOIN lafrips_category_product cap 
-                            ON cap.id_product = ava.id_product
-                        LEFT JOIN lafrips_product_attribute pat 
-                            ON pat.id_product = ava.id_product
-                            AND pat.id_product_attribute = ava.id_product_attribute
-                        LEFT JOIN lafrips_product_supplier psu 
-                            ON psu.id_product = ava.id_product 
-                            AND psu.id_product_attribute = ava.id_product_attribute ';
-
         }
         //16/07/2021 Cambiamos, colocamos nuevo input y las búsquedas de localización estarán separadas, ahora hay un input para localización y itro para localización de reposición
         //Si se introduce algo en la casilla localización manteniendo categoría raíz, se busca lo introducido en la tabla de lafrips_warehouse_product_location para localización de almacén y en mi tabla lafrips_localizaciones para localización de reposición. 
         else if (($pattern_localizacion || $pattern_localizacion !== '' || Tools::strlen($pattern_localizacion) > 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1) && ((int)$id_category == 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1)) 
         {            
             $where_especifico = 'AND wpl.location LIKE \'' . $pattern_localizacion . '%\'';
-            $joins = ' LEFT JOIN lafrips_warehouse_product_location wpl 
-                ON wpl.id_product = ava.id_product 
-                AND wpl.id_product_attribute = ava.id_product_attribute
-                AND wpl.id_warehouse = 1 ';
 
          }
 
@@ -359,9 +337,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND loc.r_location LIKE \'' . $pattern_reposicion . '%\'';
-            $joins = ' LEFT JOIN lafrips_localizaciones loc 
-                ON loc.id_product = ava.id_product 
-                AND loc.id_product_attribute = ava.id_product_attribute ';
 
          }
 
@@ -377,18 +352,6 @@ class AdminLocationManagerController extends ModuleAdminController {
                     OR pla.name LIKE \'%' . $pattern_producto. '%\')
                     AND cap.id_category = ' . (int)$id_category;
 
-                $joins = ' JOIN lafrips_product_lang pla 
-                    ON pla.id_product = ava.id_product 
-                    AND pla.id_lang = 1	
-                LEFT JOIN lafrips_category_product cap 
-                    ON cap.id_product = ava.id_product
-                LEFT JOIN lafrips_product_attribute pat 
-                    ON pat.id_product = ava.id_product
-                    AND pat.id_product_attribute = ava.id_product_attribute
-                LEFT JOIN lafrips_product_supplier psu 
-                    ON psu.id_product = ava.id_product 
-                    AND psu.id_product_attribute = ava.id_product_attribute ';
-
         }
         else //Si hay cosas en varias casillas etc se pide limpiar el formulario
         {
@@ -398,19 +361,10 @@ class AdminLocationManagerController extends ModuleAdminController {
         //16/07/2021 preparamos where para cuando se quiere filtrar abc con el nuevo select        
         if ($clas_abc == 1) {
             $where_especifico_abc = 'AND con.abc = "A"';
-            $joins .= ' LEFT JOIN lafrips_consumos con 
-                ON con.id_product = ava.id_product 
-                AND con.id_product_attribute = ava.id_product_attribute ';
         } else if ($clas_abc == 2) {
             $where_especifico_abc = 'AND con.abc = "B"';
-            $joins .= ' LEFT JOIN lafrips_consumos con 
-                ON con.id_product = ava.id_product 
-                AND con.id_product_attribute = ava.id_product_attribute ';
         } else if ($clas_abc == 3) {
             $where_especifico_abc = 'AND con.abc = "C"';
-            $joins .= ' LEFT JOIN lafrips_consumos con 
-                ON con.id_product = ava.id_product 
-                AND con.id_product_attribute = ava.id_product_attribute ';
         } else {
             $where_especifico_abc = '';
         }
@@ -508,33 +462,32 @@ class AdminLocationManagerController extends ModuleAdminController {
                 FROM lafrips_stock_available ava 
                     JOIN lafrips_product pro
 	                    ON pro.id_product = ava.id_product
-                $joins
-                    -- JOIN lafrips_product_lang pla 
-                    --     ON pla.id_product = pro.id_product 
-                    --     AND pla.id_lang = 1                    
-                    -- LEFT JOIN lafrips_category_product cap 
-                    --     ON cap.id_product = pro.id_product
-                    -- LEFT JOIN lafrips_product_attribute pat 
-                    --     ON pat.id_product = pro.id_product
-                    --     AND pat.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_product_supplier psu 
-                    --     ON psu.id_product = pro.id_product 
-                    --     AND psu.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_supply_order_detail sod 
-                    --     ON sod.id_product = pro.id_product 
-                    --     AND sod.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_supply_order sor 
-                    --     ON sor.id_supply_order = sod.id_supply_order
-                    -- LEFT JOIN lafrips_warehouse_product_location wpl 
-                    --     ON wpl.id_product = pro.id_product 
-                    --     AND wpl.id_product_attribute = ava.id_product_attribute
-                    --     AND wpl.id_warehouse = 1
-                    -- LEFT JOIN lafrips_localizaciones loc 
-                    --     ON loc.id_product = pro.id_product 
-                    --     AND loc.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_order_detail ode 
-                    --     ON ode.product_id = pro.id_product 
-                    --     AND ode.product_attribute_id = ava.id_product_attribute
+                    JOIN lafrips_product_lang pla 
+                        ON pla.id_product = pro.id_product 
+                        AND pla.id_lang = 1                    
+                    LEFT JOIN lafrips_category_product cap 
+                        ON cap.id_product = pro.id_product
+                    LEFT JOIN lafrips_product_attribute pat 
+                        ON pat.id_product = pro.id_product
+                        AND pat.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_product_supplier psu 
+                        ON psu.id_product = pro.id_product 
+                        AND psu.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_supply_order_detail sod 
+                        ON sod.id_product = pro.id_product 
+                        AND sod.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_supply_order sor 
+                        ON sor.id_supply_order = sod.id_supply_order
+                    LEFT JOIN lafrips_warehouse_product_location wpl 
+                        ON wpl.id_product = pro.id_product 
+                        AND wpl.id_product_attribute = ava.id_product_attribute
+                        AND wpl.id_warehouse = 1
+                    LEFT JOIN lafrips_localizaciones loc 
+                        ON loc.id_product = pro.id_product 
+                        AND loc.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_order_detail ode 
+                        ON ode.product_id = pro.id_product 
+                        AND ode.product_attribute_id = ava.id_product_attribute
                 WHERE 
                     pro.is_virtual = 0
                     AND pro.cache_is_pack = 0
@@ -543,8 +496,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                     )
                     $where_especifico
                     $where_especifico_abc
-                    GROUP BY ava.id_product, ava.id_product_attribute
-                    -- ORDER BY $ordenacion
+                    GROUP BY pro.id_product, ava.id_product_attribute
+                    ORDER BY $ordenacion
                     LIMIT ".$this->limit;
 
 
@@ -553,8 +506,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $solo_ids_productos = Db::getInstance()->executeS($sql_busqueda_inicial); 
 
                 $sql_busqueda_completa = "SELECT 
-                CONCAT(ava.id_product, '_', ava.id_product_attribute) AS id,
-                ava.id_product,
+                CONCAT(pro.id_product, '_', ava.id_product_attribute) AS id,
+                pro.id_product,
                 pro.cache_is_pack AS es_pack,
                 ava.id_product_attribute AS id_product_attribute,
                 IFNULL(ima.id_image, 0) AS id_image,
@@ -582,8 +535,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                 JOIN lafrips_product_lang pla 
                     ON pla.id_product = pro.id_product 
                     AND pla.id_lang = 1
-                -- LEFT JOIN lafrips_category_product cap 
-                --     ON cap.id_product = pro.id_product
+                LEFT JOIN lafrips_category_product cap 
+                    ON cap.id_product = pro.id_product
                 LEFT JOIN lafrips_image ima 
                     ON ima.id_product = pro.id_product 
                     AND ima.cover = 1
@@ -600,11 +553,11 @@ class AdminLocationManagerController extends ModuleAdminController {
                 LEFT JOIN lafrips_attribute_group_lang agl 
                     ON agl.id_attribute_group = atr.id_attribute_group 
                     AND agl.id_lang = 1
-                -- LEFT JOIN lafrips_supply_order_detail sod 
-                --     ON sod.id_product = pro.id_product 
-                --     AND sod.id_product_attribute = ava.id_product_attribute
-                -- LEFT JOIN lafrips_supply_order sor 
-                --     ON sor.id_supply_order = sod.id_supply_order
+                LEFT JOIN lafrips_supply_order_detail sod 
+                    ON sod.id_product = pro.id_product 
+                    AND sod.id_product_attribute = ava.id_product_attribute
+                LEFT JOIN lafrips_supply_order sor 
+                    ON sor.id_supply_order = sod.id_supply_order
                 LEFT JOIN lafrips_warehouse_product_location wpl 
                     ON wpl.id_product = pro.id_product 
                     AND wpl.id_product_attribute = ava.id_product_attribute
@@ -618,10 +571,9 @@ class AdminLocationManagerController extends ModuleAdminController {
                 LEFT JOIN lafrips_consumos con 
                     ON con.id_product = pro.id_product 
                     AND con.id_product_attribute = ava.id_product_attribute
-                -- LEFT JOIN lafrips_order_detail ode 
-                --     ON ode.product_id = pro.id_product 
-                --     AND ode.product_attribute_id = ava.id_product_attribute 
-                ";
+                LEFT JOIN lafrips_order_detail ode 
+                    ON ode.product_id = pro.id_product 
+                    AND ode.product_attribute_id = ava.id_product_attribute ";
 
                 $where = "WHERE (pro.id_product, ava.id_product_attribute) IN (";
 
@@ -631,7 +583,7 @@ class AdminLocationManagerController extends ModuleAdminController {
                     $where .= "($id_product, $id_product_attribute),";
                 }
 
-                $where = rtrim($where, ',') . ") GROUP BY pro.id_product, ava.id_product_attribute ORDER BY $ordenacion";
+                $where = rtrim($where, ',') . ") GROUP BY pro.id_product, ava.id_product_attribute";
 
         // die(Tools::jsonEncode(array('error'=> true, 'message'=>$sql_busqueda_completa.$where)));
 

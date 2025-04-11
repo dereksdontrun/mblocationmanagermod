@@ -5,10 +5,6 @@
  *  @copyright 2015-2016 Modulebuddy™
  *  @license   Check License.txt file in module root directory for End User License Agreement.
  *}
-
-
- {* 11/04/2025 Modificamos para quitar tienda Fisica *}
-
 {extends file="helpers/form/form.tpl"}
 {block name="other_fieldsets"}
 
@@ -35,7 +31,7 @@
                     <th class="fixed-width-xs text-center"><span class="title">ABC</span></th>
                     <th class="fixed-width-xs"><span class="title_box">{$i18n.ava_quantity|escape:'htmlall':'UTF-8'}<br>( Online )</span></th>
                     <th class="fixed-width-xs"><span class="title_box">{$i18n.phy_quantity_online|escape:'htmlall':'UTF-8'}</span></th>
-                    {* <th class="fixed-width-xs"><span class="title_box">{$i18n.phy_quantity_fisica|escape:'htmlall':'UTF-8'}</span></th> *}
+                    <th class="fixed-width-xs"><span class="title_box">{$i18n.phy_quantity_fisica|escape:'htmlall':'UTF-8'}</span></th>
                     <th class="fixed-width-xs"><span class="title_box">Permite<br>pedidos</span></th>
                     <th class="text-center"><span class="title_box">{$i18n.gestion_stock|escape:'htmlall':'UTF-8'}</span></th>
                     {* 27/03/2025 quitamos botón <th class="fixed-width-xs text-center"><span class="title">Imprimir Etiquetas</span></th> *}
@@ -67,42 +63,6 @@
 
             if (packs == 0){    
                 //17/06/2021 Hemos añadido la posibiidad de ponerse en almacén Múgica y buscar los productos de un pedido de tienda creado para reponer en tienda. Cuando se busque en ese input, los productos vendrán con una variable product_infos.pedido_para_tienda = 1, que nos indica que el gestionador de stock debe ser diferente, ya que al mostrar todos los productos independientemente de si tienen o no el almacén tienda, puede permitr sumar y restar a online, y solo queremos que permita a Tienda en ese caso.
-                //11/04/2025 Ya no hay almacén tienda, así que se podrá sumar o restar del almacén online, dejamos todo comentado debajo
-
-                if (product_infos.almacenAsignado[0] == 0){  //09/04/2025 no tienen asignado ningún almacén, hasta que modifique el módulo ya que ya no trabajamos con tienda, pongo mensaje                            
-                    var almacenes = '<option value="10" style="color:red;" disabled>ERROR ALMACENES</option><option value="6">Asignar almacén Tienda Online</option>';                    
-                    var noAsignadoOnline = '<label id="label_tienda_online_'+product_infos.id+'" for="fisica_online_'+product_infos.id+'">Almacén NO asignado</label>'; 
-                    var operaciones = '';
-                } else if (product_infos.almacenes == 1){
-                    var almacenes = '<option value="10" style="color:red;" disabled>ERROR ALMACENES</option>';
-                    var operaciones = '';
-                    var noAsignadoOnline = '';
-                } else if (product_infos.almacenAsignado[0] == 1){
-                    var almacenes = '';
-                    var operaciones = '<option value="1">Sumar Stock</option>'+
-                                '<option value="2">Restar Stock</option>';
-                    var noAsignadoOnline = '';
-                    
-                }
-
-                var local_pic = '<td><div class="input-group fixed-width-md text-center"><input type="text" name="input_location_'+product_infos.id+'" value="'+product_infos.location+'" /><br><span>('+product_infos.last_location+')</span></div></td>';
-                var local_rep = '<td><div class="input-group fixed-width-md"><input type="text" name="input_r_location_'+product_infos.id+'" value="'+product_infos.r_location+'" /></div></td>';
-
-                var gestionStock = 
-                    '<td>'+             //añadimos a cada select e input hidden el product_id para que sean únicos product_infos.id
-                        '<div class="form-group fixed-width-md" style="margin: 0 auto; float: none;">'+
-                            '<select id="select_gestion_stock_'+product_infos.id+'" class="mdb-select" name="select_gestion_stock_'+product_infos.id+'">'+
-                                '<option value="" disabled selected>Operación:</option>'+
-                                almacenes+
-                                operaciones+                                
-                            '</select>'+
-                            '<input type="text" name="input_cantidad_a_gestionar_'+product_infos.id+'" value=""  placeholder="Cantidad"/>'+
-                            '<input id="escondido_operacion_'+product_infos.id+'" type="hidden" name="input_tipo_operacion_'+product_infos.id+'" value=""/>'+
-                            '<input id="escondido_warehouse" type="hidden" name="input_id_warehouse_'+product_infos.id+'" value="1"/>';
-                        '</div>'+
-                    '</td>';
-
-                /*
                 if (product_infos.pedido_para_tienda) {
                     //tenemos que forzar que solo se pueda sumar o restar a almacén Tienda, y si no lo tiene, que haya que asignarlo primero. Si el producto tiene ambos almacenes, haremos que opere sobre id_warehouse = 4, si solo tiene tienda Múgica también. Si solo tiene online, solo daremos la opción de Asignar Tienda Múgica.
                     //variable para almacenar las operaciones en el select, sumar y restar, serán ambas si tiene elalmacén tienda, y ninguna si no lo tiene
@@ -193,18 +153,18 @@
                         '<div class="form-group fixed-width-md" style="margin: 0 auto; float: none;">'+
                             '<select id="select_gestion_stock_'+product_infos.id+'" class="mdb-select" name="select_gestion_stock_'+product_infos.id+'">'+
                                 '<option value="" disabled selected>Operación:</option>'+
-                                '<option value="1">Sumar stock Online</option>'+
-                                '<option value="2">Restar stock Online</option>'+
+                                '<option value="1">'+sumastock+'</option>'+
+                                '<option value="2">'+restastock+'</option>'+
                                 almacenes+
                             '</select>'+
                             '<input type="text" name="input_cantidad_a_gestionar_'+product_infos.id+'" value=""  placeholder="Cantidad"/>'+
                             '<input id="escondido_operacion_'+product_infos.id+'" type="hidden" name="input_tipo_operacion_'+product_infos.id+'" value=""/>'+
-                            '<input id="escondido_warehouse" type="hidden" name="input_id_warehouse_'+product_infos.id+'" value="1"/>';
+                            '<input id="escondido_warehouse" type="hidden" name="input_id_warehouse_'+product_infos.id+'" value="'+product_infos.idwarehouse+'"/>';
                         '</div>'+
                     '</td>';
 
                 }               
-                */
+
 
             }else{ //si es pack solo muestra ES PACK en gestión de stock y tampoco añade el check
                 var gestionStock = '<td><div class="form-group fixed-width-md" style="margin: 0 auto; float: none;">ES PACK</div></td>';
@@ -214,17 +174,15 @@
 
             //Si hacemos la busqueda en el almacén tienda física múgica (id=4) no queremos que nos muestre la localización de picking ni reposición ya que no la usamos, mostraremos TIENDA en lugar de la casilla de formulario
             //13/12/2023 Ponemos debajo la última localización, si la hay. Lo del span
-            /*
             if (product_infos.idwarehouse == 1) {
                 var local_pic = '<td><div class="input-group fixed-width-md text-center"><input type="text" name="input_location_'+product_infos.id+'" value="'+product_infos.location+'" /><br><span>('+product_infos.last_location+')</span></div></td>';
                 var local_rep = '<td><div class="input-group fixed-width-md"><input type="text" name="input_r_location_'+product_infos.id+'" value="'+product_infos.r_location+'" /></div></td>';
             } else {
                 var local_pic = local_rep = '<td><div class="form-group fixed-width-md" style="margin: 0 auto; float: none;">NO ALMACÉN</div></td>';
-            }*/
+            }
 
             //En la columna Disponible, con el stock total disponible, queremos poner entre paréntesis el stock online disponible, que es el resultado de restar al disponible total el stock de tienda física. Será diferente de la suma de ambos stocks físicos si el producto está en algún pedido
-            //var disponibleonline = product_infos.ava_quantity - product_infos.phy_quantity_fisica;
-            var disponibleonline = product_infos.ava_quantity;
+            var disponibleonline = product_infos.ava_quantity - product_infos.phy_quantity_fisica;
 
             //01/12/2020 Sacamos out_of_stock para indicar si el producto está disponible para compra online
             var out_of_stock = product_infos.out_of_stock;
@@ -271,7 +229,7 @@
                 '<td class="text-center">'+abc+'</td>'+
                 '<td class="text-center"><span id="disponible_'+product_infos.id+'">'+product_infos.ava_quantity+'</span><br>( <span id="disponible_online_'+product_infos.id+'">'+disponibleonline+'</span> )</td>'+
                 '<td class="text-center"><span id="fisica_online_'+product_infos.id+'">'+product_infos.phy_quantity_online+'</span>'+noAsignadoOnline+'</td>'+
-                //'<td class="text-center"><span id="fisica_tienda_'+product_infos.id+'">'+product_infos.phy_quantity_fisica+'</span>'+noAsignadoTienda+'</td>'+
+                '<td class="text-center"><span id="fisica_tienda_'+product_infos.id+'">'+product_infos.phy_quantity_fisica+'</span>'+noAsignadoTienda+'</td>'+
                 '<td class="text-center">'+permite_pedido+'</td>'+
                 gestionStock+
                 //Añadir botón de impresora etiquetas  

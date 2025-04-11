@@ -49,14 +49,12 @@ class AdminLocationManagerController extends ModuleAdminController {
     /**
      * AdminController::renderForm() override
      * @see AdminController::renderForm()
-     * 
-     * 11/04/2025 Ya no hay tienda física, de modo que quitamos el select de almacén y habrá que quitar opciones de operar sobre dicho almacén o hacer transferencias de stock
      */
     public function renderForm() {
         $this->toolbar_title = $this->module->i18n['product_location_manager'];
         //$this->displayWarning($_SERVER["REQUEST_URI"]);
         //get warehouses list
-        // $warehouses = Warehouse::getWarehouses(true); 
+        $warehouses = Warehouse::getWarehouses(true); 
 
         //get lista categorías
         $categories = Category::getCategories(1, true, false);
@@ -65,10 +63,10 @@ class AdminLocationManagerController extends ModuleAdminController {
             $this->displayWarning($this->module->i18n['no_categories_msg']);
 
         // displays warning if there are no warehouses
-        // if (!$warehouses || empty($warehouses))
-        //     $this->displayWarning($this->module->i18n['no_warehouse_msg']);
+        if (!$warehouses || empty($warehouses))
+            $this->displayWarning($this->module->i18n['no_warehouse_msg']);
 
-        // asort($warehouses); //reordenar array de almacenes para que la opción por defecto en el select sea almacén online (por id_warehouse)
+        asort($warehouses); //reordenar array de almacenes para que la opción por defecto en el select sea almacén online (por id_warehouse)
         
         //reordenar array de categorías para que aparezcan por orden alfabético, pero manteniendo Raíz como la primera
         //Primero con foreach creamos un array temporal donde se guarda en cada key suya la línea (row) de key='name' del array categories (este guarda no solo los ids de categoría sino toda la info de las categorías en la BBDD) , se puede ver con $this->displayWarning(print_r($categories));      
@@ -107,19 +105,18 @@ class AdminLocationManagerController extends ModuleAdminController {
                 'icon' => 'icon-pencil'
             ),
             'input' => array(
-                //11/04/2025 quitamos por no haber almacén tienda
-                // array(
-                //     'type' => 'select',
-                //     'label' => $this->module->i18n['warehouse'],
-                //     'name' => 'id_warehouse',
-                //     'required' => true,
-                //     'options' => array(
-                //         'query' => $warehouses,
-                //         'id' => 'id_warehouse',
-                //         'name' => 'name'
-                //     ),
-                //     'hint' => $this->module->i18n['warehouse_desc'],
-                // ),
+                array(
+                    'type' => 'select',
+                    'label' => $this->module->i18n['warehouse'],
+                    'name' => 'id_warehouse',
+                    'required' => true,
+                    'options' => array(
+                        'query' => $warehouses,
+                        'id' => 'id_warehouse',
+                        'name' => 'name'
+                    ),
+                    'hint' => $this->module->i18n['warehouse_desc'],
+                ),
                 array(//16/07/2021 Mod para filtrar por ABC
                     'type' => 'select',
                     'label' => 'Clasificación ABC',
@@ -174,10 +171,9 @@ class AdminLocationManagerController extends ModuleAdminController {
                     'hint' => 'Localización de reposición',
                 ),
                 //17/06/2021 Añadir pedido cliente para pedidos para Tienda física, escondido con Jquery mientras no se seleccione Almacén Tienda
-                //11/04/2025 Ya no hay tienda física, voy a dejar el formulario con la posibilidad de buscar productos por pedido de cliente siempre
                 array(
                     'type' => 'text',
-                    'label' => 'Pedido CLIENTE',
+                    'label' => 'Pedido para TIENDA',
                     'name' => 'pedido_tienda',
                     'required' => false,
                     'hint' => 'Introduce el ID de pedido',
@@ -243,7 +239,7 @@ class AdminLocationManagerController extends ModuleAdminController {
 
         //17/06/2021 añadimos pattern pedido Tienda y creamos una variable que indicará que es este tipo de búsqueda para utilizarla en form.tpl para mostrar bien el desplegable de gestión de stock
         $pattern_pedido_tienda = trim(pSQL(Tools::getValue('pedido_tienda', false)));
-        // $pedido_para_tienda = 0;
+        $pedido_para_tienda = 0;
 
         $pattern_localizacion = trim(pSQL(Tools::getValue('localizacion', false)));
 
@@ -252,11 +248,11 @@ class AdminLocationManagerController extends ModuleAdminController {
         $clas_abc = (int) Tools::getValue('abc', false);
         // die(Tools::jsonEncode(array('error'=> true, 'message'=>$clas_abc)));
 
-        // $id_lang = (int) $this->context->language->id;
+        $id_lang = (int) $this->context->language->id;
 
         // gets the warehouse id
         // $id_warehouse = (int) Tools::getValue('id_warehouse', false);
-        // $id_warehouse = '('.(int) Tools::getValue('id_warehouse', false).')';
+        $id_warehouse = '('.(int) Tools::getValue('id_warehouse', false).')';
 
         // gets id categoría
         $id_category = (int) Tools::getValue('id_category', false);
@@ -264,9 +260,9 @@ class AdminLocationManagerController extends ModuleAdminController {
         // get ordenación de productos, según la opción elegida en el select, al hacer LEFT JOIN en la consulta con lafrips_stock_available, recogemos quantity disponible
         $id_ordenacion = (int) Tools::getValue('id_ordenacion', false);
         if ($id_ordenacion == 1){
-            $ordenacion = 'ava.id_product DESC';
+            $ordenacion = 'pro.id_product DESC';
         }else if ($id_ordenacion == 2){
-            $ordenacion = 'ava.id_product ASC';
+            $ordenacion = 'pro.id_product ASC';
         }else if ($id_ordenacion == 3){
             $ordenacion = 'ava.quantity ASC';
         }else if ($id_ordenacion == 4){
@@ -290,8 +286,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND cap.id_category =' . (int)$id_category ;
-            $joins = ' LEFT JOIN lafrips_category_product cap 
-		                ON cap.id_product = ava.id_product ';
 
         }
         // 17/06/2021 Si se introduce algo en el input de Pedido para Tienda, queremos que se busque un pedido normal de cliente y se muestren los productos que contiene. Como pueden no tener asignado el almacén tienda, añadimos a la query un where con el id de almacen online, de modo que para ese caso muestra todos
@@ -300,9 +294,10 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND (ode.id_order = ' . $pattern_pedido_tienda . ')'; 
-            $joins = ' LEFT JOIN lafrips_order_detail ode 
-                        ON ode.product_id = ava.id_product 
-                        AND ode.product_attribute_id = ava.id_product_attribute ';
+            $id_warehouse = '(1, 4)';
+
+            //activamos el indicador de que la búsqueda será de productos de un pedido para tienda:
+            $pedido_para_tienda = 1;
                 
 
         }
@@ -311,11 +306,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND (sor.reference LIKE \'%' . $pattern_pedido . '%\')';
-            $joins = ' LEFT JOIN lafrips_supply_order_detail sod 
-                            ON sod.id_product = ava.id_product 
-                            AND sod.id_product_attribute = ava.id_product_attribute
-                        LEFT JOIN lafrips_supply_order sor 
-                            ON sor.id_supply_order = sod.id_supply_order ';
 
         }
         //Si se ha introducido algo en la casilla de Producto, manteniendo la categoría Raíz, se busca en los productos la coincidencia de lo buscado con nombre, referencia, referencia de proveedor y ean/upc. Añado AND id_category etc porque con esa busqueda reduce el tiempo a la mitad cuando no se selecciona ninguna categoría ¿? 
@@ -330,28 +320,12 @@ class AdminLocationManagerController extends ModuleAdminController {
                     OR pla.name LIKE \'%' . $pattern_producto. '%\') 
                     AND cap.id_category IN (SELECT id_category FROM lafrips_category)';
 
-            $joins = ' JOIN lafrips_product_lang pla 
-                            ON pla.id_product = ava.id_product 
-                            AND pla.id_lang = 1	
-                        LEFT JOIN lafrips_category_product cap 
-                            ON cap.id_product = ava.id_product
-                        LEFT JOIN lafrips_product_attribute pat 
-                            ON pat.id_product = ava.id_product
-                            AND pat.id_product_attribute = ava.id_product_attribute
-                        LEFT JOIN lafrips_product_supplier psu 
-                            ON psu.id_product = ava.id_product 
-                            AND psu.id_product_attribute = ava.id_product_attribute ';
-
         }
         //16/07/2021 Cambiamos, colocamos nuevo input y las búsquedas de localización estarán separadas, ahora hay un input para localización y itro para localización de reposición
         //Si se introduce algo en la casilla localización manteniendo categoría raíz, se busca lo introducido en la tabla de lafrips_warehouse_product_location para localización de almacén y en mi tabla lafrips_localizaciones para localización de reposición. 
         else if (($pattern_localizacion || $pattern_localizacion !== '' || Tools::strlen($pattern_localizacion) > 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1) && ((int)$id_category == 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_pedido || $pattern_pedido == '' || Tools::strlen($pattern_pedido) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1)) 
         {            
             $where_especifico = 'AND wpl.location LIKE \'' . $pattern_localizacion . '%\'';
-            $joins = ' LEFT JOIN lafrips_warehouse_product_location wpl 
-                ON wpl.id_product = ava.id_product 
-                AND wpl.id_product_attribute = ava.id_product_attribute
-                AND wpl.id_warehouse = 1 ';
 
          }
 
@@ -359,9 +333,6 @@ class AdminLocationManagerController extends ModuleAdminController {
         {
 
             $where_especifico = 'AND loc.r_location LIKE \'' . $pattern_reposicion . '%\'';
-            $joins = ' LEFT JOIN lafrips_localizaciones loc 
-                ON loc.id_product = ava.id_product 
-                AND loc.id_product_attribute = ava.id_product_attribute ';
 
          }
 
@@ -377,18 +348,6 @@ class AdminLocationManagerController extends ModuleAdminController {
                     OR pla.name LIKE \'%' . $pattern_producto. '%\')
                     AND cap.id_category = ' . (int)$id_category;
 
-                $joins = ' JOIN lafrips_product_lang pla 
-                    ON pla.id_product = ava.id_product 
-                    AND pla.id_lang = 1	
-                LEFT JOIN lafrips_category_product cap 
-                    ON cap.id_product = ava.id_product
-                LEFT JOIN lafrips_product_attribute pat 
-                    ON pat.id_product = ava.id_product
-                    AND pat.id_product_attribute = ava.id_product_attribute
-                LEFT JOIN lafrips_product_supplier psu 
-                    ON psu.id_product = ava.id_product 
-                    AND psu.id_product_attribute = ava.id_product_attribute ';
-
         }
         else //Si hay cosas en varias casillas etc se pide limpiar el formulario
         {
@@ -398,19 +357,10 @@ class AdminLocationManagerController extends ModuleAdminController {
         //16/07/2021 preparamos where para cuando se quiere filtrar abc con el nuevo select        
         if ($clas_abc == 1) {
             $where_especifico_abc = 'AND con.abc = "A"';
-            $joins .= ' LEFT JOIN lafrips_consumos con 
-                ON con.id_product = ava.id_product 
-                AND con.id_product_attribute = ava.id_product_attribute ';
         } else if ($clas_abc == 2) {
             $where_especifico_abc = 'AND con.abc = "B"';
-            $joins .= ' LEFT JOIN lafrips_consumos con 
-                ON con.id_product = ava.id_product 
-                AND con.id_product_attribute = ava.id_product_attribute ';
         } else if ($clas_abc == 3) {
             $where_especifico_abc = 'AND con.abc = "C"';
-            $joins .= ' LEFT JOIN lafrips_consumos con 
-                ON con.id_product = ava.id_product 
-                AND con.id_product_attribute = ava.id_product_attribute ';
         } else {
             $where_especifico_abc = '';
         }
@@ -508,33 +458,29 @@ class AdminLocationManagerController extends ModuleAdminController {
                 FROM lafrips_stock_available ava 
                     JOIN lafrips_product pro
 	                    ON pro.id_product = ava.id_product
-                $joins
-                    -- JOIN lafrips_product_lang pla 
-                    --     ON pla.id_product = pro.id_product 
-                    --     AND pla.id_lang = 1                    
-                    -- LEFT JOIN lafrips_category_product cap 
-                    --     ON cap.id_product = pro.id_product
-                    -- LEFT JOIN lafrips_product_attribute pat 
-                    --     ON pat.id_product = pro.id_product
-                    --     AND pat.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_product_supplier psu 
-                    --     ON psu.id_product = pro.id_product 
-                    --     AND psu.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_supply_order_detail sod 
-                    --     ON sod.id_product = pro.id_product 
-                    --     AND sod.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_supply_order sor 
-                    --     ON sor.id_supply_order = sod.id_supply_order
-                    -- LEFT JOIN lafrips_warehouse_product_location wpl 
-                    --     ON wpl.id_product = pro.id_product 
-                    --     AND wpl.id_product_attribute = ava.id_product_attribute
-                    --     AND wpl.id_warehouse = 1
-                    -- LEFT JOIN lafrips_localizaciones loc 
-                    --     ON loc.id_product = pro.id_product 
-                    --     AND loc.id_product_attribute = ava.id_product_attribute
-                    -- LEFT JOIN lafrips_order_detail ode 
-                    --     ON ode.product_id = pro.id_product 
-                    --     AND ode.product_attribute_id = ava.id_product_attribute
+                    JOIN lafrips_product_lang pla 
+                        ON pla.id_product = pro.id_product 
+                        AND pla.id_lang = 1                    
+                    LEFT JOIN lafrips_category_product cap 
+                        ON cap.id_product = pro.id_product
+                    LEFT JOIN lafrips_product_attribute pat 
+                        ON pat.id_product = pro.id_product
+                        AND pat.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_product_supplier psu 
+                        ON psu.id_product = pro.id_product 
+                        AND psu.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_supply_order_detail sod 
+                        ON sod.id_product = pro.id_product 
+                        AND sod.id_product_attribute = ava.id_product_attribute
+                    LEFT JOIN lafrips_supply_order sor 
+                        ON sor.id_supply_order = sod.id_supply_order
+                    LEFT JOIN lafrips_warehouse_product_location wpl 
+                        ON wpl.id_product = pro.id_product 
+                        AND wpl.id_product_attribute = ava.id_product_attribute
+                        AND wpl.id_warehouse = 1
+                    LEFT JOIN lafrips_localizaciones loc 
+                        ON loc.id_product = pro.id_product 
+                        AND loc.id_product_attribute = ava.id_product_attribute
                 WHERE 
                     pro.is_virtual = 0
                     AND pro.cache_is_pack = 0
@@ -543,8 +489,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                     )
                     $where_especifico
                     $where_especifico_abc
-                    GROUP BY ava.id_product, ava.id_product_attribute
-                    -- ORDER BY $ordenacion
+                    GROUP BY pro.id_product, ava.id_product_attribute
+                    ORDER BY $ordenacion
                     LIMIT ".$this->limit;
 
 
@@ -553,8 +499,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $solo_ids_productos = Db::getInstance()->executeS($sql_busqueda_inicial); 
 
                 $sql_busqueda_completa = "SELECT 
-                CONCAT(ava.id_product, '_', ava.id_product_attribute) AS id,
-                ava.id_product,
+                CONCAT(pro.id_product, '_', ava.id_product_attribute) AS id,
+                pro.id_product,
                 pro.cache_is_pack AS es_pack,
                 ava.id_product_attribute AS id_product_attribute,
                 IFNULL(ima.id_image, 0) AS id_image,
@@ -582,8 +528,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                 JOIN lafrips_product_lang pla 
                     ON pla.id_product = pro.id_product 
                     AND pla.id_lang = 1
-                -- LEFT JOIN lafrips_category_product cap 
-                --     ON cap.id_product = pro.id_product
+                LEFT JOIN lafrips_category_product cap 
+                    ON cap.id_product = pro.id_product
                 LEFT JOIN lafrips_image ima 
                     ON ima.id_product = pro.id_product 
                     AND ima.cover = 1
@@ -600,11 +546,11 @@ class AdminLocationManagerController extends ModuleAdminController {
                 LEFT JOIN lafrips_attribute_group_lang agl 
                     ON agl.id_attribute_group = atr.id_attribute_group 
                     AND agl.id_lang = 1
-                -- LEFT JOIN lafrips_supply_order_detail sod 
-                --     ON sod.id_product = pro.id_product 
-                --     AND sod.id_product_attribute = ava.id_product_attribute
-                -- LEFT JOIN lafrips_supply_order sor 
-                --     ON sor.id_supply_order = sod.id_supply_order
+                LEFT JOIN lafrips_supply_order_detail sod 
+                    ON sod.id_product = pro.id_product 
+                    AND sod.id_product_attribute = ava.id_product_attribute
+                LEFT JOIN lafrips_supply_order sor 
+                    ON sor.id_supply_order = sod.id_supply_order
                 LEFT JOIN lafrips_warehouse_product_location wpl 
                     ON wpl.id_product = pro.id_product 
                     AND wpl.id_product_attribute = ava.id_product_attribute
@@ -618,10 +564,9 @@ class AdminLocationManagerController extends ModuleAdminController {
                 LEFT JOIN lafrips_consumos con 
                     ON con.id_product = pro.id_product 
                     AND con.id_product_attribute = ava.id_product_attribute
-                -- LEFT JOIN lafrips_order_detail ode 
-                --     ON ode.product_id = pro.id_product 
-                --     AND ode.product_attribute_id = ava.id_product_attribute 
-                ";
+                LEFT JOIN lafrips_order_detail ode 
+                    ON ode.product_id = pro.id_product 
+                    AND ode.product_attribute_id = ava.id_product_attribute ";
 
                 $where = "WHERE (pro.id_product, ava.id_product_attribute) IN (";
 
@@ -631,7 +576,7 @@ class AdminLocationManagerController extends ModuleAdminController {
                     $where .= "($id_product, $id_product_attribute),";
                 }
 
-                $where = rtrim($where, ',') . ") GROUP BY pro.id_product, ava.id_product_attribute ORDER BY $ordenacion";
+                $where = rtrim($where, ',') . ") GROUP BY pro.id_product, ava.id_product_attribute";
 
         // die(Tools::jsonEncode(array('error'=> true, 'message'=>$sql_busqueda_completa.$where)));
 
@@ -654,8 +599,7 @@ class AdminLocationManagerController extends ModuleAdminController {
 
         foreach ($items as &$item) {
             // 17/06/2021 Añadimos a cada producto el indicador de si se trata de una búsqueda de productos en pedido para tienda
-            //11/04/2025 ya no hay almacén tienda, solo damos posibilidad de ver productos de pedido cliente
-            // $item['pedido_para_tienda'] = $pedido_para_tienda;
+            $item['pedido_para_tienda'] = $pedido_para_tienda;
             //20/05/2021 En función del consumo almacenado (si tiene) calculamos su consumo redondeado y clasificación ABC
             $consumo = $item['consumo'];
             $abc = $item['clasificacion_abc'];
@@ -683,7 +627,7 @@ class AdminLocationManagerController extends ModuleAdminController {
             $ids = array_map('intval', $ids);
             $item['ava_quantity'] = (int) StockAvailable::getQuantityAvailableByProduct($ids[0], $ids[1]); //stock disponible
             $item['phy_quantity_online'] = (int) $stock_manager->getProductPhysicalQuantities($ids[0], $ids[1], 1,true);  //stock físico online
-            // $item['phy_quantity_fisica'] = (int) $stock_manager->getProductPhysicalQuantities($ids[0], $ids[1], 4,true);  //stock físico tienda física
+            $item['phy_quantity_fisica'] = (int) $stock_manager->getProductPhysicalQuantities($ids[0], $ids[1], 4,true);  //stock físico tienda física
             $almacenes = Warehouse::getProductWarehouseList($ids[0], $ids[1]);  //almacenes activos del producto (si solo tiene uno, en tpl no daremos opción a transferir stock) Esto consulta en la tabla warehouse_product_location, por lo que no importa si tiene o ha tenido stock en los almacenes, se da por defecto id_shop ya que solo hay una de momento. Si no tiene ningún almacén asignado, no puede salir en el localizador.
             $i = 0;
             $item['almacenAsignado'][$i] = 0;
@@ -692,7 +636,6 @@ class AdminLocationManagerController extends ModuleAdminController {
                 $i++;
             }
             //si hay más de un almacen mostraremos (hecho en form.tpl) la opción de transferir stock, si no no.
-            //11/04/2025 si hay más de uno mostraremos warning ya que ahora es un error
             if ($i > 1){
                 $item['almacenes'] = 1;
             } else {
@@ -865,80 +808,75 @@ class AdminLocationManagerController extends ModuleAdminController {
                     Db::getInstance()->Execute($sql_insert_localizaciones_log);
                 }                                 
 
-            }
-            // else if(($tipo_gestion_stock == 3)||($tipo_gestion_stock == 4)){ //TRANSFERIR entre almacenes
-            //     //si $tipo_gestion_stock es 3 se transfiere de almacén de tienda "online" ID 1 al almacén de tienda "física" ID 4, y viceversa
-            //     //indicamos almacén origen y almacén destino con su id_warehouse
-            //     if($tipo_gestion_stock == 3){
-            //         $almacen_desde = 1;
-            //         $almacen_hasta = 4;
-            //     }else if($tipo_gestion_stock == 4){
-            //         $almacen_desde = 4;
-            //         $almacen_hasta = 1;
-            //     } 
+            }else if(($tipo_gestion_stock == 3)||($tipo_gestion_stock == 4)){ //TRANSFERIR entre almacenes
+                //si $tipo_gestion_stock es 3 se transfiere de almacén de tienda "online" ID 1 al almacén de tienda "física" ID 4, y viceversa
+                //indicamos almacén origen y almacén destino con su id_warehouse
+                if($tipo_gestion_stock == 3){
+                    $almacen_desde = 1;
+                    $almacen_hasta = 4;
+                }else if($tipo_gestion_stock == 4){
+                    $almacen_desde = 4;
+                    $almacen_hasta = 1;
+                } 
 
-            //     //creamos instancia de stockmanager para poder transferir stock entre almacenes
-            //     $stock_manager = new StockManager();
+                //creamos instancia de stockmanager para poder transferir stock entre almacenes
+                $stock_manager = new StockManager();
 
-            //     $posible_transferir = $stock_manager->transferBetweenWarehouses($id_product, $id_product_attribute, $cantidad_a_gestionar,$almacen_desde, $almacen_hasta);
+                $posible_transferir = $stock_manager->transferBetweenWarehouses($id_product, $id_product_attribute, $cantidad_a_gestionar,$almacen_desde, $almacen_hasta);
 
-            //     //actualizar stock_available tras la operación
-            //     StockAvailable::synchronize($id_product);
+                //actualizar stock_available tras la operación
+                StockAvailable::synchronize($id_product);
                 
-            //     //si no hay unidades suficientes en el almacen origen devuelve false, y sacamos error, si es posible ejecutará la transferencia
-            //     if(!$posible_transferir) {
-            //         die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error, Comprueba la transferencia de stock')));
-            //     } else {
-            //         $mensaje_error = 'UPDATE transferir '.$cantidad_a_gestionar.'_'.$almacen_desde.'-'.$almacen_hasta.' stock Localizador';           
+                //si no hay unidades suficientes en el almacen origen devuelve false, y sacamos error, si es posible ejecutará la transferencia
+                if(!$posible_transferir) {
+                    die(Tools::jsonEncode(array('error'=> true, 'message'=>'Error, Comprueba la transferencia de stock')));
+                } else {
+                    $mensaje_error = 'UPDATE transferir '.$cantidad_a_gestionar.'_'.$almacen_desde.'-'.$almacen_hasta.' stock Localizador';           
 
-            //         $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
-            //         (id_producto,
-            //         id_product,
-            //         id_product_attribute, 
-            //         ean,               
-            //         localizacion, 
-            //         reposicion,                             
-            //         id_employee,
-            //         nombre_employee,                
-            //         mensaje_error,
-            //         date_add)
-            //         VALUES
-            //         ('$id_producto',
-            //         $id_product,
-            //         $id_product_attribute,
-            //         '$ean13',                 
-            //         '$location', 
-            //         '$r_location',                             
-            //         $id_empleado,
-            //         '$nombre_empleado',                    
-            //         '$mensaje_error',
-            //         NOW())";
+                    $sql_insert_localizaciones_log = "INSERT INTO lafrips_localizaciones_log
+                    (id_producto,
+                    id_product,
+                    id_product_attribute, 
+                    ean,               
+                    localizacion, 
+                    reposicion,                             
+                    id_employee,
+                    nombre_employee,                
+                    mensaje_error,
+                    date_add)
+                    VALUES
+                    ('$id_producto',
+                    $id_product,
+                    $id_product_attribute,
+                    '$ean13',                 
+                    '$location', 
+                    '$r_location',                             
+                    $id_empleado,
+                    '$nombre_empleado',                    
+                    '$mensaje_error',
+                    NOW())";
                 
-            //         Db::getInstance()->Execute($sql_insert_localizaciones_log);
-            //     }   
+                    Db::getInstance()->Execute($sql_insert_localizaciones_log);
+                }   
                 
-            // }          
+            }          
 
         }
 
         //ASIGNAR A ALMACÉN TIENDA FÍSICA o a TIENDA ONLINE
-        //11/04/2025 solo a online id 6
         $almacenasignadoconexito = 0;
         //Si en el select se ha seleccionado Asignar algún almacén:
-        // if (($tipo_gestion_stock == 5)||($tipo_gestion_stock == 6)){
-        if ($tipo_gestion_stock == 6){
+        if (($tipo_gestion_stock == 5)||($tipo_gestion_stock == 6)){
             if ($cantidad_a_gestionar == '') {
                 //Si tipo gestion es 5 en el select es Asignar almacén Tienda Física a producto id_warehouse Tienda Mugica es 4
-                // if($tipo_gestion_stock == 5){
-                //    $almacenAsignado = 4;
-                // }
+                if($tipo_gestion_stock == 5){
+                   $almacenAsignado = 4;
+                }
 
                 //Si tipo gestion es 6 en el select es Asignar almacén Tienda Online a producto id_warehouse Almacen Online es 1
-                // if($tipo_gestion_stock == 6){
-                //     $almacenAsignado = 1;
-                // }
-
-                $almacenAsignado = 1;
+                if($tipo_gestion_stock == 6){
+                    $almacenAsignado = 1;
+                }
 
                 //crear nueva entrada en tabla lafrips_warehouse_product_location (asignar almacén)
                 $warehouse_location_entity = new WarehouseProductLocation();
@@ -1195,28 +1133,28 @@ class AdminLocationManagerController extends ModuleAdminController {
         //le vamos introduciendo por orden el stock available del producto, luego el físico almacén online (id 1) y el físico tienda física Múgica (id 4)
         $stock[0] = (int) StockAvailable::getQuantityAvailableByProduct($id_product, $id_product_attribute);
         $stock[1] = (int) $stock_manager->getProductPhysicalQuantities($id_product, $id_product_attribute, 1,true);
-        // $stock[2] = (int) $stock_manager->getProductPhysicalQuantities($id_product, $id_product_attribute, 4,true);   
+        $stock[2] = (int) $stock_manager->getProductPhysicalQuantities($id_product, $id_product_attribute, 4,true);   
         //en $stock metemos tambien el nombre completo del producto, id_product más id_product_attribute
-        $stock[2] = $id_producto;    
+        $stock[3] = $id_producto;    
         //Enviamos abajo con ajax el almacén sobre el que se actua para actualizar bien el select
 
 
         //para actualizar si el producto ya tiene ambos almacenes y quitar el label y añadir las opciones de transferencia, miramos que almacenes tiene ahora asignado, si es más de uno es que los tiene y ponemos $todosalmacenes = 1, si no 0.
         //el select tiene que haber cogido valor 5 o 6 y el campo de gestión haber estado vacio:
-        // if ((($tipo_gestion_stock == 5)||($tipo_gestion_stock == 6))&&($cantidad_a_gestionar == '')){
-        //     $almacenesasignados = Warehouse::getProductWarehouseList($id_product, $id_product_attribute);
+        if ((($tipo_gestion_stock == 5)||($tipo_gestion_stock == 6))&&($cantidad_a_gestionar == '')){
+            $almacenesasignados = Warehouse::getProductWarehouseList($id_product, $id_product_attribute);
 
-        //     $i = 0;
-        //     foreach ($almacenesasignados as $almacen) { //si hay más de un almacén $i irá creciendo, si $i es mayor que 1 enviaremos al ajax que tiene ambos almacenes asignados            
-        //         $i++;
-        //     }
-        //     //die(Tools::jsonEncode(array('error'=> true, 'message'=>'valor $i= '+$i)));
-        //     if (($i > 1)&&($almacenasignadoconexito == 1)) {   
-        //         $todosalmacenes = 1;
-        //     } else {
-        //         $todosalmacenes = 0; 
-        //     }
-        // }
+            $i = 0;
+            foreach ($almacenesasignados as $almacen) { //si hay más de un almacén $i irá creciendo, si $i es mayor que 1 enviaremos al ajax que tiene ambos almacenes asignados            
+                $i++;
+            }
+            //die(Tools::jsonEncode(array('error'=> true, 'message'=>'valor $i= '+$i)));
+            if (($i > 1)&&($almacenasignadoconexito == 1)) {   
+                $todosalmacenes = 1;
+            } else {
+                $todosalmacenes = 0; 
+            }
+        }
         
         //enviamos también de vuelta si el producto tiene asignado el almacén tienda física o no para quitar el check en el producto
        /* $wpl_id = (int)WarehouseProductLocation::getIdByProductAndWarehouse($product[0], $product[1], 3); 
@@ -1227,9 +1165,8 @@ class AdminLocationManagerController extends ModuleAdminController {
                 }*/
 
         //enviamos de vuelta la respuesta de ajax con el mensaje de exito y los stocks e id de producto y si está en almacén tienda
-        //'stockfisicotienda'=>$stock[2],, 'todosalmacenes'=>(int)$todosalmacenes, 'almacenenuso'=>$id_warehouse
         if($response)            
-            die(Tools::jsonEncode(array('message'=>$this->module->i18n['update_success'],'stockavailable'=>$stock[0], 'stockfisicoonline'=>$stock[1], 'productIDcompleto'=>$stock[2])));
+            die(Tools::jsonEncode(array('message'=>$this->module->i18n['update_success'],'stockavailable'=>$stock[0], 'stockfisicoonline'=>$stock[1], 'stockfisicotienda'=>$stock[2], 'productIDcompleto'=>$stock[3], 'todosalmacenes'=>(int)$todosalmacenes, 'almacenenuso'=>$id_warehouse)));
         
     }
 
