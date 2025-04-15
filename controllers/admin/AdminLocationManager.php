@@ -310,7 +310,8 @@ class AdminLocationManagerController extends ModuleAdminController {
         else if (($pattern_pedido || $pattern_pedido !== '' || Tools::strlen($pattern_pedido) > 1) && ((int)$id_category == 1) && (!$pattern_pedido_tienda || $pattern_pedido_tienda == '' || Tools::strlen($pattern_pedido_tienda) < 1) && (!$pattern_producto || $pattern_producto == '' || Tools::strlen($pattern_producto) < 1) && (!$pattern_localizacion || $pattern_localizacion == '' || Tools::strlen($pattern_localizacion) < 1) && (!$pattern_reposicion || $pattern_reposicion == '' || Tools::strlen($pattern_reposicion) < 1)) 
         {
 
-            $where_especifico = 'AND (sor.reference LIKE \'%' . $pattern_pedido . '%\')';
+            // $where_especifico = 'AND (sor.reference LIKE \'%' . $pattern_pedido . '%\')';
+            $where_especifico = 'AND (sor.reference = "' . $pattern_pedido . '")';
             $joins = ' LEFT JOIN lafrips_supply_order_detail sod 
                             ON sod.id_product = ava.id_product 
                             AND sod.id_product_attribute = ava.id_product_attribute
